@@ -13,7 +13,10 @@ public class PostsService {
     private PostsRepository postsRepository;
 
     public Post createNewPost(Post postToCreate) {
-
         return postsRepository.save(postToCreate);
+    }
+
+    public Long getLikesCount(String postId) {
+        return postsRepository.findById(postId).get().getTotal_likes();
     }
 }
