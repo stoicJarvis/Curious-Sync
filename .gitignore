@@ -38,3 +38,4 @@ out/
 
 #env
 k6/.env
+.env
