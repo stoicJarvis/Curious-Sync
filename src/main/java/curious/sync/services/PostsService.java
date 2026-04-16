@@ -16,6 +16,11 @@ public class PostsService {
         return postsRepository.save(postToCreate);
     }
 
+    public Post getPostById(String postId) {
+        return postsRepository.findById(postId)
+            .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
+    }
+
     public Long getLikesCount(String postId) {
         return postsRepository.findById(postId).get().getTotal_likes();
     }

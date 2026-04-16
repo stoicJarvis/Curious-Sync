@@ -16,7 +16,9 @@ import curious.sync.repositories.PostsRepository;
 import curious.sync.repositories.UsersRepository;
 import curious.sync.services.LikesService;
 import curious.sync.services.PostsService;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/likes")
 public class LikesController {
@@ -35,24 +37,35 @@ public class LikesController {
 
     @GetMapping()
     public String likesGreet() {
+        log.debug("GET /api/likes - greet endpoint hit");
         return "Greet from likes controller";
     }
 
     @GetMapping("/getLikes")
     public Long getLikesCount(@RequestParam String postId) {
-        return postsService.getLikesCount(postId);
+        log.info("GET /api/likes/getLikes - fetching likes count for postId: {}", postId);
+        Long count = postsService.getLikesCount(postId);
+        return count;
     }
 
     @PostMapping("/react")
     public Map<String, Object> react(@RequestBody Map<String, String> requestBody) {
         String userId = requestBody.get("user_id");
         String postId = requestBody.get("post_id");
+        log.info("POST /api/likes/react - user: {} reacting on post: {}", userId, postId);
 
         User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> {
+                log.error("User not found with id: {}", userId);
+                return new RuntimeException("User not found");
+            });
         Post post = postsRepository.findById(postId)
-            .orElseThrow(() -> new RuntimeException("Post not found"));
+            .orElseThrow(() -> {
+                log.error("Post not found with id: {}", postId);
+                return new RuntimeException("Post not found");
+            });
 
-        return likesService.react(user, post);
+        Map<String, Object> result = likesService.react(user, post);
+        return result;
     }
 }
