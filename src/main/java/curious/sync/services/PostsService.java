@@ -5,6 +5,7 @@ import java.time.Duration;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import curious.sync.configurations.RequestCoalescer;
 import curious.sync.models.Post;
 import curious.sync.repositories.PostsRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,9 @@ public class PostsService {
     private final RedisTemplate<String, Object> redisTemplate;
     private static final String CACHE_KEY_PREFIX = "post:";
 
+    private final RequestCoalescer<Post> getPostCoalescer = new RequestCoalescer<>("getPostById");
+    private final RequestCoalescer<Long> getLikesCountCoalescer = new RequestCoalescer<>("getLikesCount");
+
     public PostsService(PostsRepository postsRepository, RedisTemplate<String, Object> redisTemplate) {
         this.postsRepository = postsRepository;
         this.redisTemplate = redisTemplate;
@@ -27,26 +31,29 @@ public class PostsService {
     }
 
     public Post getPostById(String postId) {
+        return getPostCoalescer.coalesce(postId, () -> {
+            String postKey = CACHE_KEY_PREFIX + postId;
 
-        String postKey = CACHE_KEY_PREFIX + postId;
+            Post cachedPost = (Post) redisTemplate.opsForValue().get(postKey);
+            if (cachedPost != null) {
+                log.info("CACHE HIT FOR POSTID {}", postId);
+                return cachedPost;
+            }
 
-        Post cachedPost = (Post) redisTemplate.opsForValue().get(postKey);
-        if(cachedPost != null) {
-            log.info("CACHE HIT FOR POSTID {}", postId);
-            return cachedPost;
-        }
+            Post post = postsRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
 
-        Post post = postsRepository.findById(postId)
-            .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
+            log.info("DB READ FOR POSTID {}", postId);
 
-        log.info("DB READ FOR POSTID {}", postId);
+            redisTemplate.opsForValue().set(postKey, post, Duration.ofSeconds(120));
 
-        redisTemplate.opsForValue().set(postKey, post, Duration.ofSeconds(120));
-
-        return post;
+            return post;
+        });
     }
 
     public Long getLikesCount(String postId) {
-        return postsRepository.findById(postId).get().getTotal_likes();
+        return getLikesCountCoalescer.coalesce(postId, () ->
+            postsRepository.findById(postId).get().getTotal_likes()
+        );
     }
 }
