@@ -1,11 +1,14 @@
 package curious.sync.services;
 
 import java.time.Duration;
+import java.util.Optional;
 
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
-import curious.sync.configurations.RequestCoalescer;
+import curious.sync.configurations.RequestCoalescer.RequestCoalescer;
 import curious.sync.models.Post;
 import curious.sync.repositories.PostsRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -13,7 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Slf4j
 public class PostsService {
-    
+
     private final PostsRepository postsRepository;
     private final RedisTemplate<String, Object> redisTemplate;
     private static final String CACHE_KEY_PREFIX = "post:";
@@ -41,7 +44,7 @@ public class PostsService {
             }
 
             Post post = postsRepository.findById(postId)
-                .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
+                    .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
 
             log.info("DB READ FOR POSTID {}", postId);
 
@@ -52,8 +55,12 @@ public class PostsService {
     }
 
     public Long getLikesCount(String postId) {
-        return getLikesCountCoalescer.coalesce(postId, () ->
-            postsRepository.findById(postId).get().getTotal_likes()
-        );
+        return getLikesCountCoalescer.coalesce(postId, () -> postsRepository.findById(postId).get().getTotal_likes());
+    }
+
+    public Post getPost(String postId) {
+        return postsRepository.findById(postId)
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found with id: " + postId));
     }
 }

@@ -1,17 +1,20 @@
 package curious.sync.services;
 
+import static curious.sync.constants.Strings.LIKE_EVENT;
+import static curious.sync.constants.Strings.UNLIKE_EVENT;
+
 import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import curious.sync.configurations.RequestCoalescer;
 import curious.sync.models.Like;
 import curious.sync.models.Post;
 import curious.sync.models.User;
+import curious.sync.models.Events.ReactionEvent;
 import curious.sync.repositories.LikesRepository;
-import curious.sync.repositories.PostsRepository;
+import curious.sync.services.kafka.kafkaEventProducers.ReactionEventProducer;
 
 @Service
 public class LikesService {
@@ -20,33 +23,28 @@ public class LikesService {
     private LikesRepository likesRepository;
 
     @Autowired
-    private PostsRepository postsRepository;
-
-    private final RequestCoalescer<Map<String, Object>> reactCoalescer = new RequestCoalescer<>("react");
+    private ReactionEventProducer reactionEventProducer;
 
     public Map<String, Object> react(User user, Post post) {
-        String key = user.getUser_id() + ":" + post.getPost_id();
-        return reactCoalescer.coalesce(key, () -> {
-            Optional<Like> existingLike = likesRepository.findByUserAndPost(user, post);
+        Optional<Like> existingLike = likesRepository.findByUserAndPost(user, post);
 
-            if (existingLike.isPresent()) {
-                likesRepository.delete(existingLike.get());
-                post.setTotal_likes(post.getTotal_likes() - 1);
-                postsRepository.save(post);
+        ReactionEvent reactionEvent = ReactionEvent.builder()
+                .postId(post.getPost_id())
+                .userId(user.getUser_id())
+                .build();
 
-                return Map.of("action", "unliked", "post_id", post.getPost_id(), "total_likes", post.getTotal_likes());
-            } else {
-                Like like = Like.builder()
-                                .user(user)
-                                .post(post)
-                                .build();
-                likesRepository.save(like);
+        if (existingLike.isPresent()) {
+            reactionEvent.setEventType(UNLIKE_EVENT);
+            reactionEventProducer.sendUnlikeEvent(reactionEvent);
 
-                post.setTotal_likes(post.getTotal_likes() + 1);
-                postsRepository.save(post);
+            return Map.of("action", UNLIKE_EVENT, "post_id", post.getPost_id(), "total_likes",
+                    post.getTotal_likes());
+        } else {
+            reactionEvent.setEventType(LIKE_EVENT);
+            reactionEventProducer.sendLikeEvent(reactionEvent);
 
-                return Map.of("action", "liked", "post_id", post.getPost_id(), "total_likes", post.getTotal_likes());
-            }
-        });
+            return Map.of("action", LIKE_EVENT, "post_id", post.getPost_id(), "total_likes",
+                    post.getTotal_likes());
+        }
     }
 }
