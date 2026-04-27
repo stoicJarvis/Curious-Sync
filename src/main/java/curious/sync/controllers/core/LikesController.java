@@ -12,10 +12,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import curious.sync.models.Post;
 import curious.sync.models.User;
-import curious.sync.repositories.PostsRepository;
-import curious.sync.repositories.UsersRepository;
 import curious.sync.services.LikesService;
 import curious.sync.services.PostsService;
+import curious.sync.services.UsersService;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -30,10 +29,7 @@ public class LikesController {
     PostsService postsService;
 
     @Autowired
-    private UsersRepository usersRepository;
-
-    @Autowired
-    private PostsRepository postsRepository;
+    private UsersService usersService;
 
     @GetMapping()
     public String likesGreet() {
@@ -52,20 +48,14 @@ public class LikesController {
     public Map<String, Object> react(@RequestBody Map<String, String> requestBody) {
         String userId = requestBody.get("user_id");
         String postId = requestBody.get("post_id");
+
         log.info("POST /api/likes/react - user: {} reacting on post: {}", userId, postId);
 
-        User user = usersRepository.findById(userId)
-            .orElseThrow(() -> {
-                log.error("User not found with id: {}", userId);
-                return new RuntimeException("User not found");
-            });
-        Post post = postsRepository.findById(postId)
-            .orElseThrow(() -> {
-                log.error("Post not found with id: {}", postId);
-                return new RuntimeException("Post not found");
-            });
+        User user = usersService.getUser(userId);
+        Post post = postsService.getPost(postId);
 
         Map<String, Object> result = likesService.react(user, post);
+
         return result;
     }
 }

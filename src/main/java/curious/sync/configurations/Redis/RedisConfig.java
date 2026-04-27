@@ -1,4 +1,4 @@
-package curious.sync.configurations;
+package curious.sync.configurations.Redis;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

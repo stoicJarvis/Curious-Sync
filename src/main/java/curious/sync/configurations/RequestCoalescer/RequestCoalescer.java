@@ -1,4 +1,4 @@
-package curious.sync.configurations;
+package curious.sync.configurations.RequestCoalescer;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -10,8 +10,11 @@ import org.slf4j.LoggerFactory;
 
 /**
  * RequestCoalescer: Prevents the "Thundering Herd" effect.
- * If X threads request the same Key at once, only ONE thread (the Leader) executes the Supplier. The other X-1 threads (Followers) wait for the Leader's result.
- * This protects our database from being crushed by duplicate concurrent requests.
+ * If X threads request the same Key at once, only ONE thread (the Leader)
+ * executes the Supplier. The other X-1 threads (Followers) wait for the
+ * Leader's result.
+ * This protects our database from being crushed by duplicate concurrent
+ * requests.
  */
 public class RequestCoalescer<T> {
 
