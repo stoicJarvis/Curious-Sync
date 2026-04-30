@@ -1,13 +1,26 @@
 const fs = require('fs');
 const { execSync } = require("child_process");
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const DB = "Curious-Sync";
-const USER = "postgres";
-const PASSWORD = "Admin@1234";
+const DB = process.env.DATABASE_NAME || "postgres";
+const USER = process.env.DATABASE_USERNAME || "postgres";
+const PASSWORD = process.env.DATABASE_PASSWORD || "Admin@1234";
 const CSV_PATH = path.join(__dirname, "users_data.csv");
+const DATABASE_URL = process.env.DATABASE_URL || '';
+let HOST = process.env.DATABASE_HOST || 'localhost';
+let PORT = process.env.DATABASE_PORT || 5432;
+if (!process.env.DATABASE_HOST && DATABASE_URL) {
+  try {
+    const url = new URL(DATABASE_URL.replace(/^jdbc:/, ''));
+    HOST = url.hostname || HOST;
+    PORT = url.port || PORT;
+  } catch (err) {
+    // fall back to defaults
+  }
+}
 
-const TOTAL = 5_000_000;
+const TOTAL = 1_000_000;
 
 const FIRST_NAMES = [
   "James","Mary","Robert","Patricia","John","Jennifer","Michael","Linda",
@@ -62,7 +75,7 @@ function main() {
     
     writeStream.write(`${name},${email},${password}\n`);
     
-    if (i % 500000 === 0) console.log(`  Generated ${i.toLocaleString()} rows...`);
+    if (i % TOTAL === 0) console.log(`  Generated ${i.toLocaleString()} rows...`);
   }
   
   writeStream.end();
@@ -72,12 +85,12 @@ function main() {
     
     // The Magic Command: COPY
     // We use STDIN so we don't have permission issues with the Postgres user reading our local file
-    const copyCmd = `psql -h localhost -U ${USER} -d "${DB}" -c "\\copy users(name, email, password) FROM '${CSV_PATH}' WITH DELIMITER ',' CSV"`;
+    const copyCmd = `psql -h ${HOST} -p ${PORT} -U ${USER} -d "${DB}" -c "\\copy users(name, email, password) FROM '${CSV_PATH}' WITH DELIMITER ',' CSV"`;
     
     try {
       execSync(copyCmd, { env: { ...process.env, PGPASSWORD: PASSWORD }, stdio: "inherit" });
       const totalTime = ((Date.now() - start) / 1000).toFixed(1);
-      console.log(`Done! 5M rows handled in ${totalTime}s`);
+      console.log(`Done! ${TOTAL.toLocaleString()} rows handled in ${totalTime}s`);
       
       // Optional: fs.unlinkSync(CSV_PATH); // Delete CSV after
     } catch (err) {

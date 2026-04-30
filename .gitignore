@@ -39,3 +39,6 @@ out/
 #env
 k6/.env
 .env
+
+node_modules/
+package-lock.json
