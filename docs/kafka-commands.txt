@@ -1,0 +1,26 @@
+1. Get the cluserId
+KAFKA_CLUSTER_ID=$(bin/kafka-storage.sh random-uuid)
+
+2. Create meta.properties
+bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/server.properties --standalone
+
+3. Start the server
+bin/kafka-server-start.sh config/server.properties
+
+4. Create the topic
+bin/kafka-topics.sh --create --topic like --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
+
+5. List topics
+bin/kafka-topics.sh --list --bootstrap-server localhost:9092
+
+6. Delete topic
+bin/kafka-topics.sh --delete --topic like --bootstrap-server localhost:9092
+
+7. Describe topic
+bin/kafka-topics.sh --describe --topic like --bootstrap-server localhost:9092
+
+8. Start Producer
+bin/kafka-console-producer.sh --topic like --bootstrap-server localhost:9092
+
+9. Start Consumer
+bin/kafka-console-consumer.sh --topic reactions --bootstrap-server localhost:9092 --from-beginning
