@@ -10,11 +10,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import curious.sync.models.Post;
-import curious.sync.models.User;
-import curious.sync.services.LikesService;
-import curious.sync.services.PostsService;
-import curious.sync.services.UsersService;
+import curious.sync.models.core.Post;
+import curious.sync.models.core.User;
+import curious.sync.services.core.LikesService;
+import curious.sync.services.core.PostsService;
+import curious.sync.services.core.UsersService;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j

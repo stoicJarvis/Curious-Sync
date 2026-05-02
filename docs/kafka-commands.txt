@@ -1,26 +1,33 @@
-1. Get the cluserId
+1. Generate a cluster ID
 KAFKA_CLUSTER_ID=$(bin/kafka-storage.sh random-uuid)
 
-2. Create meta.properties
+2. Format storage
 bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/server.properties --standalone
 
 3. Start the server
 bin/kafka-server-start.sh config/server.properties
 
-4. Create the topic
-bin/kafka-topics.sh --create --topic like --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
+4. Create topics with 12 partitions (12 partitions = 12 consumer threads can work fully in parallel)
+bin/kafka-topics.sh --create --topic like   --bootstrap-server localhost:9092 --partitions 12 --replication-factor 1
+bin/kafka-topics.sh --create --topic unlike --bootstrap-server localhost:9092 --partitions 12 --replication-factor 1
 
 5. List topics
 bin/kafka-topics.sh --list --bootstrap-server localhost:9092
 
-6. Delete topic
-bin/kafka-topics.sh --delete --topic like --bootstrap-server localhost:9092
+6. Describe topic (check partition count and leaders)
+bin/kafka-topics.sh --describe --topic like   --bootstrap-server localhost:9092
+bin/kafka-topics.sh --describe --topic unlike --bootstrap-server localhost:9092
 
-7. Describe topic
-bin/kafka-topics.sh --describe --topic like --bootstrap-server localhost:9092
+7. Delete topics
+bin/kafka-topics.sh --delete --topic like   --bootstrap-server localhost:9092
+bin/kafka-topics.sh --delete --topic unlike --bootstrap-server localhost:9092
 
-8. Start Producer
+8. Start console producer
 bin/kafka-console-producer.sh --topic like --bootstrap-server localhost:9092
 
-9. Start Consumer
-bin/kafka-console-consumer.sh --topic reactions --bootstrap-server localhost:9092 --from-beginning
+9. Start console consumer (read from beginning)
+bin/kafka-console-consumer.sh --topic like --bootstrap-server localhost:9092 --from-beginning
+bin/kafka-console-consumer.sh --topic unlike --bootstrap-server localhost:9092 --from-beginning
+
+10. Check consumer group lag (critical for load testing)
+bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group likes-processor-group

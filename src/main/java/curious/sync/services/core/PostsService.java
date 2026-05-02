@@ -1,7 +1,6 @@
-package curious.sync.services;
+package curious.sync.services.core;
 
 import java.time.Duration;
-import java.util.Optional;
 
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -9,8 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import curious.sync.configurations.RequestCoalescer.RequestCoalescer;
-import curious.sync.models.Post;
+import curious.sync.models.core.Post;
 import curious.sync.repositories.PostsRepository;
+import curious.sync.services.redis.likesCache.LikeStateCache;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
@@ -19,14 +19,18 @@ public class PostsService {
 
     private final PostsRepository postsRepository;
     private final RedisTemplate<String, Object> redisTemplate;
-    private static final String CACHE_KEY_PREFIX = "post:";
+    private final LikeStateCache likeStateCache;
 
     private final RequestCoalescer<Post> getPostCoalescer = new RequestCoalescer<>("getPostById");
-    private final RequestCoalescer<Long> getLikesCountCoalescer = new RequestCoalescer<>("getLikesCount");
+    
+    private static final String CACHE_KEY_PREFIX = "post:";
 
-    public PostsService(PostsRepository postsRepository, RedisTemplate<String, Object> redisTemplate) {
+    public PostsService(PostsRepository postsRepository,
+                        RedisTemplate<String, Object> redisTemplate,
+                        LikeStateCache likeStateCache) {
         this.postsRepository = postsRepository;
         this.redisTemplate = redisTemplate;
+        this.likeStateCache = likeStateCache;
     }
 
     public Post createNewPost(Post postToCreate) {
@@ -47,15 +51,18 @@ public class PostsService {
                     .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
 
             log.info("DB READ FOR POSTID {}", postId);
-
             redisTemplate.opsForValue().set(postKey, post, Duration.ofSeconds(120));
-
             return post;
         });
     }
 
+    /**
+     * Returns like count from Redis counter (seeded from DB on cold cache).
+     * Under high load, this never touches PostgreSQL — it reads the Redis counter
+     * that LikeBatchProcessor keeps in sync after every processed batch.
+     */
     public Long getLikesCount(String postId) {
-        return getLikesCountCoalescer.coalesce(postId, () -> postsRepository.findById(postId).get().getTotal_likes());
+        return likeStateCache.getCount(postId);
     }
 
     public Post getPost(String postId) {

@@ -1,4 +1,4 @@
-package curious.sync.models;
+package curious.sync.models.core;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

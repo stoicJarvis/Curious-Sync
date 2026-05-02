@@ -3,7 +3,7 @@ package curious.sync.repositories;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import curious.sync.models.User;
+import curious.sync.models.core.User;
 
 @Repository
 public interface UsersRepository extends JpaRepository<User, String> {

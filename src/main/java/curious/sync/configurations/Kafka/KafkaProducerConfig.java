@@ -24,9 +24,25 @@ public class KafkaProducerConfig {
     @Bean
     ProducerFactory<String, ReactionEvent> producerFactory() {
         Map<String, Object> config = new HashMap<>();
+
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+
+        // Batching
+        config.put(ProducerConfig.LINGER_MS_CONFIG, 20);
+
+        // Batch size
+        config.put(ProducerConfig.BATCH_SIZE_CONFIG, 65536);
+
+        // Compression
+        config.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
+
+        // Durability
+        config.put(ProducerConfig.ACKS_CONFIG, "1");
+
+        // Up to 5 in-flight batches per connection (safe with acks=1).
+        config.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
 
         return new DefaultKafkaProducerFactory<>(config);
     }

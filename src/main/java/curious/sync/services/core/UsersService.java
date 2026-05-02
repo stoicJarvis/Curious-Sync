@@ -1,11 +1,11 @@
-package curious.sync.services;
+package curious.sync.services.core;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import curious.sync.models.User;
+import curious.sync.models.core.User;
 import curious.sync.repositories.UsersRepository;
 import lombok.extern.slf4j.Slf4j;
 
