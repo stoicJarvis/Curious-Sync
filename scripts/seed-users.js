@@ -3,13 +3,13 @@ const { execSync } = require("child_process");
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const DB = process.env.DATABASE_NAME || "postgres";
-const USER = process.env.DATABASE_USERNAME || "postgres";
-const PASSWORD = process.env.DATABASE_PASSWORD || "Admin@1234";
+const DB = process.env.DATABASE_NAME;
+const USER = process.env.DATABASE_USERNAME;
+const PASSWORD = process.env.DATABASE_PASSWORD;
 const CSV_PATH = path.join(__dirname, "users_data.csv");
-const DATABASE_URL = process.env.DATABASE_URL || '';
-let HOST = process.env.DATABASE_HOST || 'localhost';
-let PORT = process.env.DATABASE_PORT || 5432;
+const DATABASE_URL = process.env.DATABASE_URL;
+let HOST = process.env.DATABASE_HOST;
+let PORT = process.env.DATABASE_PORT;
 if (!process.env.DATABASE_HOST && DATABASE_URL) {
   try {
     const url = new URL(DATABASE_URL.replace(/^jdbc:/, ''));
@@ -20,7 +20,7 @@ if (!process.env.DATABASE_HOST && DATABASE_URL) {
   }
 }
 
-const TOTAL = 1_000_000;
+const TOTAL = 10;
 
 const FIRST_NAMES = [
   "James","Mary","Robert","Patricia","John","Jennifer","Michael","Linda",
