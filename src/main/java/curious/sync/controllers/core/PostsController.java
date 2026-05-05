@@ -8,22 +8,22 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import curious.sync.models.Post;
-import curious.sync.models.User;
-import curious.sync.repositories.UsersRepository;
-import curious.sync.services.PostsService;
+import curious.sync.models.core.Post;
+import curious.sync.models.core.User;
+import curious.sync.services.core.PostsService;
+import curious.sync.services.core.UsersService;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/posts")
 public class PostsController {
-    
+
     @Autowired
     PostsService postsService;
 
     @Autowired
-    private UsersRepository usersRepository;
+    private UsersService usersService;
 
     @GetMapping()
     public String postsGreet() {
@@ -35,11 +35,7 @@ public class PostsController {
     public Post createNewPost(@RequestBody Post postToCreate) {
         log.info("POST /api/posts - creating post for user_id: {}", postToCreate.getUser().getUser_id());
 
-        User user = usersRepository.findById(postToCreate.getUser().getUser_id())
-            .orElseThrow(() -> {
-                log.error("User not found with id: {}", postToCreate.getUser().getUser_id());
-                return new RuntimeException("User not found");
-            });
+        User user = usersService.getUser(postToCreate.getUser().getUser_id());
 
         postToCreate.setUser(user);
 

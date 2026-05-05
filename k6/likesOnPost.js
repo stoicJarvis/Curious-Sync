@@ -2,12 +2,14 @@ import { check } from "k6";
 import { SharedArray } from "k6/data";
 import http from "k6/http";
 
-// Load .env file into a lookup object
+// Load root .env file into a lookup object
 const env = {};
-open("./.env")
+open("../.env")
   .trim()
-  .split("\n")
+  .split(/\r?\n/)
   .forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) return;
     const [key, ...val] = line.split("=");
     if (key && val.length) env[key.trim()] = val.join("=").trim();
   });
@@ -40,7 +42,7 @@ export default function () {
     headers: { "Content-Type": "application/json" },
   };
 
-  const res = http.post(`${env.REACT_BASE_URL}`, payload, params);
+  const res = http.post(`${env.REACT_URL}`, payload, params);
 
   check(res, {
     "status is 200": (r) => r.status === 200,
