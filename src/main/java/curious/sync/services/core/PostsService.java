@@ -57,9 +57,7 @@ public class PostsService {
     }
 
     /**
-     * Returns like count from Redis counter (seeded from DB on cold cache).
-     * Under high load, this never touches PostgreSQL — it reads the Redis counter
-     * that LikeBatchProcessor keeps in sync after every processed batch.
+     * Returns like count for the given postId
      */
     public Long getLikesCount(String postId) {
         return likeStateCache.getCount(postId);

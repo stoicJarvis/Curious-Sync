@@ -24,18 +24,6 @@ import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Core of the high-throughput like pipeline.
- *
- * Given a raw batch of ReactionEvents from Kafka, this service:
- * 1. Deduplicates within the batch (last-event-wins per userId+postId)
- * 2. Filters events already reflected in Redis state (skip known duplicates)
- * 3. Falls back to DB for any Redis cache misses (cold-start safety)
- * 4. Bulk-inserts new likes via saveAll (Hibernate batches with JDBC
- * batch_size)
- * 5. Issues ONE atomic UPDATE per unique postId (not one per like)
- * 6. Keeps Redis state + count caches in sync
- */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -48,40 +36,49 @@ public class LikeBatchProcessor {
 
     /**
      * Generic method to process reaction events.
-     * Separates like and unlike events and processes them separately.
+     * Segregates like and unlike events and processes them separately.
      */
     @Transactional
     public void processReactionsBatch(List<ReactionEvent> events) {
-        if (events == null || events.isEmpty())
+        if (events == null || events.isEmpty()) {
             return;
+        }
 
         log.info("Processing batch of {} reaction events", events.size());
 
-        // If the same user likes + unlikes the same post in one batch, the LAST event
-        // wins.
+        // If the same user likes + unlikes the same post in one batch, the LAST event wins.
         Map<String, ReactionEvent> uniqueReactions = new HashMap<>();
         for (ReactionEvent event : events) {
             uniqueReactions.put(event.getUserId() + ":" + event.getPostId(), event);
         }
-        log.debug("After dedup: {} unique events (from {})", uniqueReactions.size(), events.size());
 
         List<ReactionEvent> likeEvents = new ArrayList<>();
         List<ReactionEvent> unlikeEvents = new ArrayList<>();
-        for (ReactionEvent e : uniqueReactions.values()) {
-            if (LIKE_EVENT.equals(e.getEventType()))
-                likeEvents.add(e);
-            else if (UNLIKE_EVENT.equals(e.getEventType()))
-                unlikeEvents.add(e);
+        for (ReactionEvent event : uniqueReactions.values()) {
+            if (LIKE_EVENT.equals(event.getEventType())) {
+                likeEvents.add(event);
+            } else if (UNLIKE_EVENT.equals(event.getEventType())) {
+                unlikeEvents.add(event);
+            } else {
+                log.error("Malformed event captured: {}", event);
+            }
         }
 
-        if (!likeEvents.isEmpty())
+        if (!likeEvents.isEmpty()) {
             processLikes(likeEvents);
+        }
 
-        if (!unlikeEvents.isEmpty())
+        if (!unlikeEvents.isEmpty()) {
             processUnlikes(unlikeEvents);
+        }
     }
 
     private void processLikes(List<ReactionEvent> likeEvents) {
+
+        if (likeEvents == null || likeEvents.isEmpty()) {
+            return;
+        }
+
         Map<String, List<ReactionEvent>> byPost = likeEvents.stream()
                 .collect(Collectors.groupingBy(ReactionEvent::getPostId));
 
@@ -94,26 +91,26 @@ public class LikeBatchProcessor {
                     .distinct()
                     .collect(Collectors.toList());
 
-            List<String> possiblyNew = userIds.stream()
+            List<String> candidateLikes = userIds.stream()
                     .filter(userId -> !likeStateCache.hasLiked(postId, userId))
                     .collect(Collectors.toList());
 
-            if (possiblyNew.isEmpty()) {
+            if (candidateLikes.isEmpty()) {
                 log.debug("[like] All {} events for post {} already in Redis — skipped", userIds.size(), postId);
                 continue;
             }
 
-            Set<String> existingInDb = likesRepository.findExistingLikerIds(postId, possiblyNew);
-            List<String> trulyNew = possiblyNew.stream()
+            Set<String> existingInDb = likesRepository.findExistingLikerIds(postId, candidateLikes);
+            List<String> newLikeEvents = candidateLikes.stream()
                     .filter(userId -> !existingInDb.contains(userId))
                     .collect(Collectors.toList());
 
-            if (trulyNew.isEmpty()) {
+            if (newLikeEvents.isEmpty()) {
                 log.debug("[like] All Redis-miss events for post {} already exist in DB — skipped", postId);
                 continue;
             }
 
-            List<Like> newLikes = trulyNew.stream()
+            List<Like> newLikes = newLikeEvents.stream()
                     .map(userId -> Like.builder()
                             .post(entityManager.getReference(Post.class, postId))
                             .user(entityManager.getReference(User.class, userId))
@@ -121,21 +118,25 @@ public class LikeBatchProcessor {
                     .collect(Collectors.toList());
             likesRepository.saveAll(newLikes);
 
-            long delta = trulyNew.size();
+            long delta = newLikeEvents.size();
 
             postsRepository.incrementLikesBy(postId, delta);
 
-            // Sync Redis
             likeStateCache.incrementCountBy(postId, delta);
-            trulyNew.forEach(userId -> likeStateCache.markLiked(postId, userId));
+            newLikeEvents.forEach(userId -> likeStateCache.markLiked(postId, userId));
 
             log.info("[like] post={} inserted={} skipped(redis)={} skipped(db)={}",
-                    postId, delta, userIds.size() - possiblyNew.size(), possiblyNew.size() - trulyNew.size());
+                    postId, delta, userIds.size() - candidateLikes.size(), candidateLikes.size() - candidateLikes.size());
         }
     }
 
-    private void processUnlikes(List<ReactionEvent> events) {
-        Map<String, List<ReactionEvent>> byPost = events.stream()
+    private void processUnlikes(List<ReactionEvent> unlikEvents) {
+
+        if (unlikEvents == null || unlikEvents.isEmpty()) {
+            return;
+        }
+
+        Map<String, List<ReactionEvent>> byPost = unlikEvents.stream()
                 .collect(Collectors.groupingBy(ReactionEvent::getPostId));
 
         for (Map.Entry<String, List<ReactionEvent>> entry : byPost.entrySet()) {

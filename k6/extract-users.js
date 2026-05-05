@@ -3,9 +3,9 @@ const fs = require("fs");
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
-const DATABASE_URL = process.env.DATABASE_URL || "";
-let HOST = process.env.DATABASE_HOST || "localhost";
-let PORT = process.env.DATABASE_PORT || 5432;
+const DATABASE_URL = process.env.DATABASE_URL;
+let HOST = process.env.DATABASE_HOST;
+let PORT = process.env.DATABASE_PORT;
 if (!process.env.DATABASE_HOST && DATABASE_URL) {
   try {
     const url = new URL(DATABASE_URL.replace(/^jdbc:/, ""));
@@ -15,11 +15,9 @@ if (!process.env.DATABASE_HOST && DATABASE_URL) {
     // fall back to defaults
   }
 }
-const DB = process.env.DATABASE_NAME || process.env.DB_NAME || "postgres";
-const USER =
-  process.env.DATABASE_USERNAME || process.env.DB_USERNAME || "postgres";
-const PASSWORD =
-  process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD || "Admin@1234";
+const DB = process.env.DATABASE_NAME;
+const USER = process.env.DATABASE_USERNAME;
+const PASSWORD = process.env.DATABASE_PASSWORD;
 
 const sql = "SELECT user_id FROM users ORDER BY RANDOM() LIMIT 5000";
 const raw = execSync(

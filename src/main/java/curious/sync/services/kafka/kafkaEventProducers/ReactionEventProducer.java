@@ -15,10 +15,16 @@ public class ReactionEventProducer {
     @Autowired
     private KafkaTemplate<String, ReactionEvent> kafkaTemplate;
 
+    /**
+     * Pushes the like event into kafka topic
+     */
     public void sendLikeEvent(ReactionEvent reactionEvent) {
         kafkaTemplate.send(LIKE_EVENT, reactionEvent.getPostId(), reactionEvent);
     }
 
+    /**
+     * Pushes the unlike event into kafka topic
+     */
     public void sendUnlikeEvent(ReactionEvent reactionEvent) {
         kafkaTemplate.send(UNLIKE_EVENT, reactionEvent.getPostId(), reactionEvent);
     }

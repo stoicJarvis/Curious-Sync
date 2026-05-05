@@ -40,5 +40,8 @@ out/
 k6/.env
 .env
 
+k6/users.json
+k6/posts.json
+
 node_modules/
 package-lock.json

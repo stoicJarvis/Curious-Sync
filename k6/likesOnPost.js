@@ -42,7 +42,7 @@ export default function () {
     headers: { "Content-Type": "application/json" },
   };
 
-  const res = http.post(`${env.REACT_BASE_URL}`, payload, params);
+  const res = http.post(`${env.REACT_URL}`, payload, params);
 
   check(res, {
     "status is 200": (r) => r.status === 200,
