@@ -60,7 +60,7 @@ public class PostsService {
      * Returns like count for the given postId
      */
     public Long getLikesCount(String postId) {
-        return likeStateCache.getCount(postId);
+        return likeStateCache.getLikesCount(postId);
     }
 
     public Post getPost(String postId) {

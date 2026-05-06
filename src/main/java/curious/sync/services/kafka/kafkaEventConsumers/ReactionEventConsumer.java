@@ -11,7 +11,7 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 import curious.sync.models.Events.ReactionEvent;
-import curious.sync.services.kafka.kafkaBatchProcessors.LikeBatchProcessor;
+import curious.sync.services.kafka.kafkaBatchProcessors.LikesBatchProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ReactionEventConsumer {
 
-    private final LikeBatchProcessor likeBatchProcessor;
+    private final LikesBatchProcessor likeBatchProcessor;
 
     /**
      * Batch consumes like events from Kafka topic and processes them.
