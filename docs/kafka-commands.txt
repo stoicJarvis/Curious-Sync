@@ -1,3 +1,6 @@
+# Wipe the old data
+rm -rf /tmp/kraft-combined-logs
+
 1. Generate a cluster ID
 KAFKA_CLUSTER_ID=$(bin/kafka-storage.sh random-uuid)
 

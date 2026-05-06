@@ -27,7 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class LikeBatchProcessor {
+public class LikesBatchProcessor {
 
     private final LikesRepository likesRepository;
     private final PostsRepository postsRepository;
@@ -74,13 +74,15 @@ public class LikeBatchProcessor {
     }
 
     private void processLikes(List<ReactionEvent> likeEvents) {
-
         if (likeEvents == null || likeEvents.isEmpty()) {
             return;
         }
 
         Map<String, List<ReactionEvent>> byPost = likeEvents.stream()
                 .collect(Collectors.groupingBy(ReactionEvent::getPostId));
+
+        List<Like> allNewLikesToSave = new ArrayList<>();
+        Map<String, Long> redisCountDeltas = new HashMap<>();
 
         for (Map.Entry<String, List<ReactionEvent>> entry : byPost.entrySet()) {
             String postId = entry.getKey();
@@ -91,8 +93,10 @@ public class LikeBatchProcessor {
                     .distinct()
                     .collect(Collectors.toList());
 
+            // Batch check Redis
+            List<String> alreadyInRedis = likeStateCache.filterAlreadyLiked(postId, userIds);
             List<String> candidateLikes = userIds.stream()
-                    .filter(userId -> !likeStateCache.hasLiked(postId, userId))
+                    .filter(userId -> !alreadyInRedis.contains(userId))
                     .collect(Collectors.toList());
 
             if (candidateLikes.isEmpty()) {
@@ -100,73 +104,96 @@ public class LikeBatchProcessor {
                 continue;
             }
 
+            // Batch check DB
             Set<String> existingInDb = likesRepository.findExistingLikerIds(postId, candidateLikes);
-            List<String> newLikeEvents = candidateLikes.stream()
+            List<String> newLikeUserIds = candidateLikes.stream()
                     .filter(userId -> !existingInDb.contains(userId))
                     .collect(Collectors.toList());
 
-            if (newLikeEvents.isEmpty()) {
+            if (newLikeUserIds.isEmpty()) {
                 log.debug("[like] All Redis-miss events for post {} already exist in DB — skipped", postId);
+                likeStateCache.markLikedBatch(postId, candidateLikes);
                 continue;
             }
 
-            List<Like> newLikes = newLikeEvents.stream()
-                    .map(userId -> Like.builder()
-                            .post(entityManager.getReference(Post.class, postId))
-                            .user(entityManager.getReference(User.class, userId))
-                            .build())
-                    .collect(Collectors.toList());
-            likesRepository.saveAll(newLikes);
+            // Prepare entities
+            newLikeUserIds.forEach(userId -> {
+                allNewLikesToSave.add(Like.builder()
+                        .post(entityManager.getReference(Post.class, postId))
+                        .user(entityManager.getReference(User.class, userId))
+                        .build());
+            });
 
-            long delta = newLikeEvents.size();
-
+            // Update DB counts
+            long delta = newLikeUserIds.size();
             postsRepository.incrementLikesBy(postId, delta);
-
-            likeStateCache.incrementCountBy(postId, delta);
-            newLikeEvents.forEach(userId -> likeStateCache.markLiked(postId, userId));
+            
+            redisCountDeltas.put(postId, delta);
+            
+            // Batch mark Redis state
+            likeStateCache.markLikedBatch(postId, candidateLikes); 
 
             log.info("[like] post={} inserted={} skipped(redis)={} skipped(db)={}",
-                    postId, delta, userIds.size() - candidateLikes.size(), candidateLikes.size() - candidateLikes.size());
+                    postId, delta, alreadyInRedis.size(), existingInDb.size());
+        }
+
+        // Bulk Save to DB
+        if (!allNewLikesToSave.isEmpty()) {
+            likesRepository.saveAll(allNewLikesToSave);
+        }
+
+        // Bulk update Redis counts
+        if (!redisCountDeltas.isEmpty()) {
+            likeStateCache.incrementLikesCount(redisCountDeltas);
         }
     }
 
-    private void processUnlikes(List<ReactionEvent> unlikEvents) {
-
-        if (unlikEvents == null || unlikEvents.isEmpty()) {
+    private void processUnlikes(List<ReactionEvent> unlikeEvents) {
+        if (unlikeEvents == null || unlikeEvents.isEmpty()) {
             return;
         }
 
-        Map<String, List<ReactionEvent>> byPost = unlikEvents.stream()
+        Map<String, List<ReactionEvent>> byPost = unlikeEvents.stream()
                 .collect(Collectors.groupingBy(ReactionEvent::getPostId));
+
+        Map<String, Long> redisCountDeltas = new HashMap<>();
 
         for (Map.Entry<String, List<ReactionEvent>> entry : byPost.entrySet()) {
             String postId = entry.getKey();
             List<ReactionEvent> batch = entry.getValue();
+            List<String> userIds = batch.stream().map(ReactionEvent::getUserId).collect(Collectors.toList());
 
-            // Only process users that Redis confirms have actually liked
-            List<String> confirmedLikers = batch.stream()
-                    .map(ReactionEvent::getUserId)
-                    .filter(userId -> likeStateCache.hasLiked(postId, userId))
-                    .collect(Collectors.toList());
+            // Only process users that Redis confirms have actually liked (pipelined)
+            List<String> confirmedLikers = likeStateCache.filterAlreadyLiked(postId, userIds);
 
             if (confirmedLikers.isEmpty()) {
                 log.debug("[unlike] No confirmed likers for post {} — skipped", postId);
                 continue;
             }
 
-            // Delete each (indexed lookup on unique constraint — very fast)
-            long deleted = confirmedLikers.stream()
+            // Delete each from DB (still one-by-one as deleteByUserIdAndPostId is specific)
+            // But we can collect the total deleted for count updates
+            long deletedCount = confirmedLikers.stream()
                     .mapToInt(userId -> likesRepository.deleteByUserIdAndPostId(userId, postId))
                     .sum();
 
-            if (deleted > 0) {
-                postsRepository.decrementLikesBy(postId, deleted);
-                likeStateCache.decrementCountBy(postId, deleted);
-                confirmedLikers.forEach(userId -> likeStateCache.markUnliked(postId, userId));
+            if (deletedCount > 0) {
+                // Atomic DB decrement
+                postsRepository.decrementLikesBy(postId, deletedCount);
+                
+                redisCountDeltas.put(postId, deletedCount);
+                
+                // Batch mark Redis as unliked
+                likeStateCache.markUnlikedBatch(postId, confirmedLikers);
             }
 
             log.info("[unlike] post={} deleted={} skipped(redis)={}",
-                    postId, deleted, batch.size() - confirmedLikers.size());
+                    postId, deletedCount, batch.size() - confirmedLikers.size());
+        }
+
+        // Bulk update Redis counts
+        if (!redisCountDeltas.isEmpty()) {
+            likeStateCache.decrementLikesCount(redisCountDeltas);
         }
     }
 }
