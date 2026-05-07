@@ -43,6 +43,7 @@ k6/.env
 k6/users.json
 k6/posts.json
 scripts/users_data.csv
+scripts/kafka-events.jsonl
 
 node_modules/
 package-lock.json
