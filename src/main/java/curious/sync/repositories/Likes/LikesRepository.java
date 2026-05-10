@@ -1,4 +1,4 @@
-package curious.sync.repositories;
+package curious.sync.repositories.Likes;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -15,7 +15,7 @@ import curious.sync.models.core.Post;
 import curious.sync.models.core.User;
 
 @Repository
-public interface LikesRepository extends JpaRepository<Like, String> {
+public interface LikesRepository extends JpaRepository<Like, String>, ILikesRepository {
 
     /**
      * Finds a like by user and post.
