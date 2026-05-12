@@ -43,8 +43,6 @@ public class LikesRepositoryImpl implements ILikesRepository {
         String[] userIds = allEvents.stream().map(ReactionEvent::getUserId).toArray(String[]::new);
         String[] postIds = allEvents.stream().map(ReactionEvent::getPostId).toArray(String[]::new);
 
-        // Single query to identify existing (user, post) pairs using UNNEST for
-        // efficiency
         String sql = """
                 SELECT l.user_id, l.post_id
                 FROM likes l
@@ -65,8 +63,8 @@ public class LikesRepositoryImpl implements ILikesRepository {
                     }
                     return existingKeysSet;
                 }
-            } catch (SQLException e) {
-                throw new RuntimeException("Error filtering existing likes", e);
+            } catch (SQLException error) {
+                throw new RuntimeException("Error filtering existing likes", error);
             }
         });
 
@@ -89,8 +87,7 @@ public class LikesRepositoryImpl implements ILikesRepository {
     }
 
     /**
-     * Inserts likes and increments post like counts in a single atomic DB trip.
-     * Uses PostgreSQL CTE and UNNEST for maximum performance on large batches.
+     * Inserts likes and increments post like counts in a single DB trip.
      *
      * @param events Map of postId to list of ReactionEvents to insert
      */
@@ -107,10 +104,6 @@ public class LikesRepositoryImpl implements ILikesRepository {
         String[] userIds = allEvents.stream().map(ReactionEvent::getUserId).toArray(String[]::new);
         String[] postIds = allEvents.stream().map(ReactionEvent::getPostId).toArray(String[]::new);
 
-        // Optimized CTE: 
-        // 1. Insert unique likes,
-        // 2. Count insertions per post, 
-        // 3. Update post counts
         String sql = """
                 WITH input_data AS (
                     SELECT UNNEST(?) as u_id, UNNEST(?) as p_id
@@ -120,15 +113,132 @@ public class LikesRepositoryImpl implements ILikesRepository {
                     SELECT u_id, p_id FROM input_data
                     ON CONFLICT (user_id, post_id) DO NOTHING
                     RETURNING post_id
-                )
-                UPDATE posts
-                SET total_likes = total_likes + counts.like_count
-                FROM (
+                ),
+                counts AS (
                     SELECT post_id, count(*) as like_count
                     FROM inserted_likes
                     GROUP BY post_id
-                ) AS counts
+                ),
+                lock_rows AS (
+                    SELECT post_id FROM posts
+                    WHERE post_id IN (SELECT post_id FROM counts)
+                    ORDER BY post_id
+                    FOR UPDATE
+                )
+                UPDATE posts
+                SET total_likes = total_likes + counts.like_count
+                FROM counts
                 WHERE posts.post_id = counts.post_id
+                AND EXISTS (SELECT 1 FROM lock_rows WHERE lock_rows.post_id = posts.post_id)
+                """;
+
+        jdbcTemplate.execute(sql, (PreparedStatement preparedStatement) -> {
+            Connection connection = preparedStatement.getConnection();
+            preparedStatement.setArray(1, connection.createArrayOf("text", userIds));
+            preparedStatement.setArray(2, connection.createArrayOf("text", postIds));
+            return preparedStatement.executeUpdate();
+        });
+    }
+
+    @Override
+    public Map<String, List<ReactionEvent>> discardOrphanedUnlikes(Map<String, List<ReactionEvent>> events) {
+        if (events == null || events.isEmpty()) {
+            return events;
+        }
+
+        List<ReactionEvent> allEvents = events.values().stream()
+                .flatMap(List::stream)
+                .toList();
+
+        String[] userIds = allEvents.stream().map(ReactionEvent::getUserId).toArray(String[]::new);
+        String[] postIds = allEvents.stream().map(ReactionEvent::getPostId).toArray(String[]::new);
+
+        String sql = """
+                SELECT l.user_id, l.post_id
+                FROM likes l
+                JOIN (
+                    SELECT UNNEST(?) as u_id, UNNEST(?) as p_id
+                ) as input ON l.user_id = input.u_id AND l.post_id = input.p_id
+                """;
+
+        Set<String> existingKeys = jdbcTemplate.execute((Connection connection) -> {
+            try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+                preparedStatement.setArray(1, connection.createArrayOf("text", userIds));
+                preparedStatement.setArray(2, connection.createArrayOf("text", postIds));
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    Set<String> existingKeysSet = new HashSet<>();
+                    while (resultSet.next()) {
+                        existingKeysSet.add(KeyUtils.getUserPostEventKey(resultSet.getString("user_id"),
+                                resultSet.getString("post_id")));
+                    }
+                    return existingKeysSet;
+                }
+            } catch (SQLException error) {
+                throw new RuntimeException("Error filtering existing likes", error);
+            }
+        });
+
+        if (existingKeys == null || existingKeys.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        // Return a map with only those unlikes that have a corresponding like in the DB
+        Map<String, List<ReactionEvent>> filteredEvents = new HashMap<>();
+        events.forEach((postId, postEvents) -> {
+            List<ReactionEvent> filtered = postEvents.stream()
+                    .filter(e -> existingKeys.contains(KeyUtils.getUserPostEventKey(e.getUserId(), e.getPostId())))
+                    .toList();
+            if (!filtered.isEmpty()) {
+                filteredEvents.put(postId, filtered);
+            }
+        });
+
+        return filteredEvents;
+    }
+
+    @Override
+    public void deleteBatchOfUnlikeAndLikesCount(Map<String, List<ReactionEvent>> unlikesEvent) {
+        if (unlikesEvent == null || unlikesEvent.isEmpty()) {
+            return;
+        }
+        
+        List<ReactionEvent> allEvents = unlikesEvent.values().stream()
+                .flatMap(List::stream)
+                .toList();
+
+        String[] userIds = allEvents.stream().map(ReactionEvent::getUserId).toArray(String[]::new);
+        String[] postIds = allEvents.stream().map(ReactionEvent::getPostId).toArray(String[]::new);
+
+        String sql = """
+                WITH input_data AS (
+                    SELECT UNNEST(?) as u_id, UNNEST(?) as p_id
+                ),
+                deleted_likes AS (
+                    DELETE FROM likes
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM input_data
+                        WHERE likes.user_id = input_data.u_id
+                        AND likes.post_id = input_data.p_id
+                    )
+                    RETURNING post_id
+                ),
+                counts AS (
+                    SELECT post_id, count(*) as unlike_count
+                    FROM deleted_likes
+                    GROUP BY post_id
+                ),
+                lock_rows AS (
+                    SELECT post_id FROM posts
+                    WHERE post_id IN (SELECT post_id FROM counts)
+                    ORDER BY post_id
+                    FOR UPDATE
+                )
+                UPDATE posts
+                SET total_likes = total_likes - counts.unlike_count
+                FROM counts
+                WHERE posts.post_id = counts.post_id
+                AND EXISTS (SELECT 1 FROM lock_rows WHERE lock_rows.post_id = posts.post_id)
                 """;
 
         jdbcTemplate.execute(sql, (PreparedStatement preparedStatement) -> {

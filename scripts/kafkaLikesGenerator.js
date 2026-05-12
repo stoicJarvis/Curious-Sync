@@ -35,15 +35,29 @@ async function main() {
     }
 
     console.log(`Found ${userIds.length} users and ${postIds.length} posts.`);
-    const filePath = path.join(__dirname, 'kafka-events.jsonl');
+    const filePath = path.join(__dirname, 'kafka-like-events.jsonl');
     const stream = fs.createWriteStream(filePath);
 
-    console.log(`Generating ${NUMBER_OF_EVENTS.toLocaleString()} events to ${filePath}...`);
+    const totalPossible = userIds.length * postIds.length;
+    if (NUMBER_OF_EVENTS > totalPossible) {
+        console.error(`Cannot generate ${NUMBER_OF_EVENTS} unique events. Max possible is ${totalPossible}.`);
+        process.exit(1);
+    }
+
+    console.log(`Generating ${NUMBER_OF_EVENTS.toLocaleString()} unique events to ${filePath}...`);
     
+    const usedPairs = new Set();
     const start = Date.now();
-    for (let i = 0; i < NUMBER_OF_EVENTS; i++) {
+    let count = 0;
+
+    while (count < NUMBER_OF_EVENTS) {
         const userId = userIds[Math.floor(Math.random() * userIds.length)];
         const postId = postIds[Math.floor(Math.random() * postIds.length)];
+        const key = `${userId}:${postId}`;
+
+        if (usedPairs.has(key)) continue;
+
+        usedPairs.add(key);
         const event = {
             userId: userId,
             postId: postId,
@@ -55,8 +69,9 @@ async function main() {
             await new Promise(resolve => stream.once('drain', resolve));
         }
 
-        if (i > 0 && i % 250000 === 0) {
-            console.log(`  Progress: ${i.toLocaleString()} events...`);
+        count++;
+        if (count > 0 && count % 250000 === 0) {
+            console.log(`  Progress: ${count.toLocaleString()} events...`);
         }
     }
 

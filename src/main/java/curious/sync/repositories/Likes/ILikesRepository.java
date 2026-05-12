@@ -15,4 +15,14 @@ public interface ILikesRepository {
      * Inserts the given batch of like events into the database and updates the like count of the posts
      */
     void insertBatchOfLikeAndLikesCount(Map<String, List<ReactionEvent>> events);
+
+    /**
+     * Removes events from the batch if the user has already unliked the post.
+     */
+    Map<String, List<ReactionEvent>> discardOrphanedUnlikes(Map<String, List<ReactionEvent>> events);
+
+    /**
+     * Removes the given batch of unlike events from the database and updates the like count of the posts
+     */
+    void deleteBatchOfUnlikeAndLikesCount(Map<String, List<ReactionEvent>> unlikesEvent);
 }

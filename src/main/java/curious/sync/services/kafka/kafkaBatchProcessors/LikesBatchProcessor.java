@@ -37,8 +37,6 @@ public class LikesBatchProcessor {
             return;
         }
 
-        log.info("Processing batch of {} reaction events", events.size());
-
         // If the same user likes + unlikes the same post in one batch, the LAST event wins.
         Map<String, ReactionEvent> uniqueReactions = new HashMap<>();
         for (ReactionEvent event : events) {
@@ -78,11 +76,12 @@ public class LikesBatchProcessor {
             return;
         }
 
-        List<ReactionEvent> filteredLikeEvents = filterLikeEvents(likeEvents);
-        Map<String, List<ReactionEvent>> likesByPostId = filteredLikeEvents.stream()
-                .collect(Collectors.groupingBy(ReactionEvent::getPostId));
+        log.info("Processing batch of {} like events", likeEvents.size());
 
-        Map<String, List<ReactionEvent>> filteredBatchOfLikes = likeStateCache.filterAlreadyLikedEvents(likesByPostId);
+        List<ReactionEvent> filteredLikeEvents = filterDuplicateEvents(likeEvents);
+        Map<String, List<ReactionEvent>> likesByPostId = mapEventsByPostId(filteredLikeEvents);
+
+        Map<String, List<ReactionEvent>> filteredBatchOfLikes = likeStateCache.excludeExistingLikedEvents(likesByPostId);
 
         if (filteredBatchOfLikes.isEmpty()) return;
         
@@ -93,28 +92,70 @@ public class LikesBatchProcessor {
         likesRepository.insertBatchOfLikeAndLikesCount(finalBatchOfLikes);
 
         likeStateCache.syncLikesBatchAndLikesCount(finalBatchOfLikes);
+
+        int totalProcessed = finalBatchOfLikes.values().stream().mapToInt(List::size).sum();
+        log.info("[likes-processor] Successfully processed {} like events across {} posts", totalProcessed, finalBatchOfLikes.size());
     }
 
+    /**
+     * Filters unlike events by checking against Redis like state cache and then against DB like state.
+     * Inserts the filtered unlike events into the database and updates the like count of the posts.
+     * Synchronizes the filtered unlike events to Redis like state cache.
+     * @param unlikeEvents List of unlike events to process
+     */
     private void processUnlikes(List<ReactionEvent> unlikeEvents) {
         if (unlikeEvents == null || unlikeEvents.isEmpty()) {
             return;
         }
+
+        log.info("Processing batch of {} unlike events", unlikeEvents.size());
+
+        List<ReactionEvent> filteredUnlikeEvents = filterDuplicateEvents(unlikeEvents);
+        Map<String, List<ReactionEvent>> unlikesByPostId = mapEventsByPostId(filteredUnlikeEvents);
+
+        Map<String, List<ReactionEvent>> filteredBatchOfUnlikes = likeStateCache.excludeExistingUnlikedEvents(unlikesByPostId);
+
+        if (filteredBatchOfUnlikes.isEmpty()) return;
+        
+        Map<String, List<ReactionEvent>> finalBatchOfUnlikes = likesRepository.discardOrphanedUnlikes(filteredBatchOfUnlikes);
+
+        if (finalBatchOfUnlikes.isEmpty()) return;
+
+        likesRepository.deleteBatchOfUnlikeAndLikesCount(finalBatchOfUnlikes);
+
+        likeStateCache.syncUnlikesBatchAndLikesCount(finalBatchOfUnlikes);
+
+        int totalProcessed = finalBatchOfUnlikes.values().stream().mapToInt(List::size).sum();
+        log.info("[unlikes-processor] Successfully processed {} unlike events across {} posts", totalProcessed, finalBatchOfUnlikes.size());
     }
 
     /**
-     * if multiple likes are there for same user and post, then only last event will be considered
+     * if multiple events are there for same user and post, then only last event will be considered
      */
-    private List<ReactionEvent> filterLikeEvents(List<ReactionEvent> likeEvents) {
-        if (likeEvents == null || likeEvents.isEmpty()) {
+    private List<ReactionEvent> filterDuplicateEvents(List<ReactionEvent> events) {
+        if (events == null || events.isEmpty()) {
             return new ArrayList<>();
         }
 
-        return new ArrayList<>(likeEvents.stream()
+        return new ArrayList<>(events.stream()
                 .collect(Collectors.toMap(
-                        likeEvent -> KeyUtils.getUserPostEventKey(likeEvent.getUserId(), likeEvent.getPostId()),
-                        likeEvent -> likeEvent,
+                        event -> KeyUtils.getUserPostEventKey(event.getUserId(), event.getPostId()),
+                        event -> event,
                         (existing, incoming) -> incoming // Keep the latest event
                 ))
                 .values());
+    }
+
+    /**
+     * Returns a map of reaction events keyed by post ID.
+     */
+    private Map<String, List<ReactionEvent>> mapEventsByPostId(List<ReactionEvent> reactionEvents) {
+
+        if (reactionEvents == null || reactionEvents.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        return reactionEvents.stream()
+                .collect(Collectors.groupingBy(ReactionEvent::getPostId));
     }
 }

@@ -84,24 +84,6 @@ public class LikeStateCache {
     }
 
     /**
-     * Marks multiple users as having liked a specific post using a pipeline.
-     */
-    public void markLikedBatch(String postId, List<String> userIds) {
-        if (userIds == null || userIds.isEmpty())
-            return;
-
-        String key = KeyUtils.getRedisStateKey(LIKE_STATE_CACHE, postId);
-        redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-            byte[] keyBytes = key.getBytes();
-            for (String userId : userIds) {
-                connection.sAdd(keyBytes, userId.getBytes());
-            }
-            connection.expire(keyBytes, LIKE_STATE_TTL.getSeconds());
-            return null;
-        });
-    }
-
-    /**
      * Returns cached count, or seeds from DB on cache miss.
      */
     public Long getLikesCount(String postId) {
@@ -122,46 +104,12 @@ public class LikeStateCache {
     }
 
     /**
-     * Increments the like count for multiple posts using a pipeline.
-     */
-    public void incrementLikesCount(Map<String, Long> postDeltas) {
-        if (postDeltas == null || postDeltas.isEmpty())
-            return;
-
-        redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-            postDeltas.forEach((postId, delta) -> {
-                String key = KeyUtils.getRedisCountKey(LIKE_COUNT_CACHE, postId);
-                connection.incrBy(key.getBytes(), delta);
-                connection.expire(key.getBytes(), LIKE_COUNT_TTL.getSeconds());
-            });
-            return null;
-        });
-    }
-
-    /**
-     * Decrements the like count for multiple posts using a pipeline.
-     */
-    public void decrementLikesCount(Map<String, Long> postDeltas) {
-        if (postDeltas == null || postDeltas.isEmpty())
-            return;
-
-        redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-            postDeltas.forEach((postId, delta) -> {
-                String key = KeyUtils.getRedisCountKey(LIKE_COUNT_CACHE, postId);
-                connection.decrBy(key.getBytes(), delta);
-                connection.expire(key.getBytes(), LIKE_COUNT_TTL.getSeconds());
-            });
-            return null;
-        });
-    }
-
-    /**
      * Filters out events for posts that have already been liked by the users.
      * 
      * @return A map of post IDs to lists of reaction events, with already liked
      *         events removed.
      */
-    public Map<String, List<ReactionEvent>> filterAlreadyLikedEvents(Map<String, List<ReactionEvent>> eventsByPostId) {
+    public Map<String, List<ReactionEvent>> excludeExistingLikedEvents(Map<String, List<ReactionEvent>> eventsByPostId) {
         if (eventsByPostId == null || eventsByPostId.isEmpty()) {
             return eventsByPostId;
         }
@@ -231,37 +179,69 @@ public class LikeStateCache {
         });
     }
 
-    /**
-     * Filters the input map and returns only the events that are ALREADY liked in Redis.
-     */
-    public List<ReactionEvent> filterConfirmedLikes(Map<String, List<ReactionEvent>> eventsByPostId) {
-        if (eventsByPostId == null || eventsByPostId.isEmpty()) return List.of();
+    public Map<String, List<ReactionEvent>> excludeExistingUnlikedEvents(Map<String, List<ReactionEvent>> eventsByPostId) {
+        if (eventsByPostId == null || eventsByPostId.isEmpty()) {
+            return eventsByPostId;
+        }
 
         List<String> orderedPostIds = new ArrayList<>(eventsByPostId.keySet());
 
         List<Object> pipelineResults = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
             for (String postId : orderedPostIds) {
+                String redisKey = KeyUtils.getRedisStateKey(LIKE_STATE_CACHE, postId);
+
                 byte[][] userIds = eventsByPostId.get(postId).stream()
                         .map(event -> event.getUserId().getBytes(StandardCharsets.UTF_8))
                         .toArray(byte[][]::new);
-                connection.sMIsMember(KeyUtils.getRedisStateKey(LIKE_STATE_CACHE, postId).getBytes(StandardCharsets.UTF_8), userIds);
+
+                connection.sMIsMember(redisKey.getBytes(StandardCharsets.UTF_8), userIds);
             }
             return null;
         });
 
-        List<ReactionEvent> confirmed = new ArrayList<>();
-        for (int i = 0; i < orderedPostIds.size(); i++) {
-            List<ReactionEvent> eventsForPost = eventsByPostId.get(orderedPostIds.get(i));
-            @SuppressWarnings("unchecked")
-            List<Boolean> membershipResults = (List<Boolean>) pipelineResults.get(i);
-            if (membershipResults == null) continue;
+        Set<String> eventsToRemove = new HashSet<>();
 
-            for (int j = 0; j < membershipResults.size(); j++) {
-                if (Boolean.TRUE.equals(membershipResults.get(j))) {
-                    confirmed.add(eventsForPost.get(j));
+        for (int postIdIterator = 0; postIdIterator < orderedPostIds.size(); postIdIterator++) {
+            String postId = orderedPostIds.get(postIdIterator);
+            List<ReactionEvent> eventsForPost = eventsByPostId.get(postId);
+
+            @SuppressWarnings("unchecked")
+            List<Boolean> membershipResults = (List<Boolean>) pipelineResults.get(postIdIterator);
+
+            for (int eventIterator = 0; eventIterator < eventsForPost.size(); eventIterator++) {
+                if (Boolean.FALSE.equals(membershipResults.get(eventIterator))) {
+                    ReactionEvent event = eventsForPost.get(eventIterator);
+                    eventsToRemove.add(KeyUtils.generateUserPostKey(event.getUserId(), event.getPostId()));
                 }
             }
         }
-        return confirmed;
+
+        eventsByPostId.values().forEach(eventList -> eventList.removeIf(
+                event -> eventsToRemove.contains(KeyUtils.generateUserPostKey(event.getUserId(), event.getPostId()))));
+
+        eventsByPostId.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+
+        return eventsByPostId;
+    }
+
+    public void syncUnlikesBatchAndLikesCount(Map<String, List<ReactionEvent>> unlikesEvent) {
+        if (unlikesEvent == null || unlikesEvent.isEmpty()) return;
+
+        redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            unlikesEvent.forEach((postId, events) -> {
+                String stateKey = KeyUtils.getRedisStateKey(LIKE_STATE_CACHE, postId);
+                byte[] stateKeyBytes = stateKey.getBytes(StandardCharsets.UTF_8);
+                for (ReactionEvent event : events) {
+                    connection.sRem(stateKeyBytes, event.getUserId().getBytes(StandardCharsets.UTF_8));
+                }
+                connection.expire(stateKeyBytes, LIKE_STATE_TTL.getSeconds());
+
+                String countKey = KeyUtils.getRedisCountKey(LIKE_COUNT_CACHE, postId);
+                byte[] countKeyBytes = countKey.getBytes(StandardCharsets.UTF_8);
+                connection.decrBy(countKeyBytes, events.size());
+                connection.expire(countKeyBytes, LIKE_COUNT_TTL.getSeconds());
+            });
+            return null;
+        });
     }
 }
