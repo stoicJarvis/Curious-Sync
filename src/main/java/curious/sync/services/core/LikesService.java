@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import curious.sync.models.Events.ReactionEvent;
 import curious.sync.models.core.Post;
 import curious.sync.models.core.User;
-import curious.sync.repositories.LikesRepository;
+import curious.sync.repositories.Likes.LikesRepository;
 import curious.sync.services.kafka.kafkaEventProducers.ReactionEventProducer;
 import curious.sync.services.redis.likesCache.LikeStateCache;
 import lombok.RequiredArgsConstructor;

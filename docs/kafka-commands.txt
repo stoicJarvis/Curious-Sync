@@ -36,4 +36,7 @@ bin/kafka-console-consumer.sh --topic unlike --bootstrap-server localhost:9092 -
 bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group likes-processor-group
 
 11. Seed the dummy events into kafka
-cat ../../Desktop/Projects/Curious-Sync/scripts/kafka_events.jsonl | bin/kafka-console-producer.sh --topic like --bootstrap-server localhost:9092
+cat ../../Desktop/Projects/Curious-Sync/scripts/kafka-like-events.jsonl | bin/kafka-console-producer.sh --topic like --bootstrap-server localhost:9092
+
+12. Seed the dummy events into kafka for unlike
+cat ../../Desktop/Projects/Curious-Sync/scripts/kafka-unlike-events.jsonl | bin/kafka-console-producer.sh --topic unlike --bootstrap-server localhost:9092
