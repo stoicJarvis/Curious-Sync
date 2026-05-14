@@ -158,7 +158,7 @@ public class LikeStateCache {
      * Synchronizes likes to Redis in a single pipeline trip.
      * Updates both the state (sets) and the likes count (counters).
      */
-    public void syncLikesBatchAndLikesCount(Map<String, List<ReactionEvent>> likesEvent) {
+    public void syncLikesBatchAndLikesCount(Map<String, List<ReactionEvent>> likesEvent, Map<String, Long> postsDelta) {
         if (likesEvent == null || likesEvent.isEmpty()) return;
 
         redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
@@ -170,10 +170,13 @@ public class LikeStateCache {
                 }
                 connection.expire(stateKeyBytes, LIKE_STATE_TTL.getSeconds());
 
-                String countKey = KeyUtils.getRedisCountKey(LIKE_COUNT_CACHE, postId);
-                byte[] countKeyBytes = countKey.getBytes(StandardCharsets.UTF_8);
-                connection.incrBy(countKeyBytes, events.size());
-                connection.expire(countKeyBytes, LIKE_COUNT_TTL.getSeconds());
+                Long insertedCount = postsDelta.getOrDefault(postId, 0L);
+                if (insertedCount > 0) {
+                    String countKey = KeyUtils.getRedisCountKey(LIKE_COUNT_CACHE, postId);
+                    byte[] countKeyBytes = countKey.getBytes(StandardCharsets.UTF_8);
+                    connection.incrBy(countKeyBytes, insertedCount);
+                    connection.expire(countKeyBytes, LIKE_COUNT_TTL.getSeconds());
+                }
             });
             return null;
         });
@@ -224,7 +227,7 @@ public class LikeStateCache {
         return eventsByPostId;
     }
 
-    public void syncUnlikesBatchAndLikesCount(Map<String, List<ReactionEvent>> unlikesEvent) {
+    public void syncUnlikesBatchAndLikesCount(Map<String, List<ReactionEvent>> unlikesEvent, Map<String, Long> postsDelta) {
         if (unlikesEvent == null || unlikesEvent.isEmpty()) return;
 
         redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
@@ -236,10 +239,13 @@ public class LikeStateCache {
                 }
                 connection.expire(stateKeyBytes, LIKE_STATE_TTL.getSeconds());
 
-                String countKey = KeyUtils.getRedisCountKey(LIKE_COUNT_CACHE, postId);
-                byte[] countKeyBytes = countKey.getBytes(StandardCharsets.UTF_8);
-                connection.decrBy(countKeyBytes, events.size());
-                connection.expire(countKeyBytes, LIKE_COUNT_TTL.getSeconds());
+                Long deletedCount = postsDelta.getOrDefault(postId, 0L);
+                if (deletedCount > 0) {
+                    String countKey = KeyUtils.getRedisCountKey(LIKE_COUNT_CACHE, postId);
+                    byte[] countKeyBytes = countKey.getBytes(StandardCharsets.UTF_8);
+                    connection.decrBy(countKeyBytes, deletedCount);
+                    connection.expire(countKeyBytes, LIKE_COUNT_TTL.getSeconds());
+                }
             });
             return null;
         });

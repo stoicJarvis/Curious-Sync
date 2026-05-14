@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import curious.sync.models.Events.ReactionEvent;
 import curious.sync.repositories.Likes.LikesRepository;
@@ -31,7 +30,6 @@ public class LikesBatchProcessor {
      * Generic method to process reaction events.
      * Segregates like and unlike events and processes them separately.
      */
-    @Transactional
     public void processReactionsBatch(List<ReactionEvent> events) {
         if (events == null || events.isEmpty()) {
             return;
@@ -65,7 +63,7 @@ public class LikesBatchProcessor {
     }
 
     /**
-     * Filters like events by checking against Redis like state cache and then against DB like state.
+     * Filters like events by checking against Redis like state cache.
      * Inserts the filtered like events into the database and updates the like count of the posts.
      * Synchronizes the filtered like events to Redis like state cache.
      * 
@@ -84,22 +82,18 @@ public class LikesBatchProcessor {
         Map<String, List<ReactionEvent>> filteredBatchOfLikes = likeStateCache.excludeExistingLikedEvents(likesByPostId);
 
         if (filteredBatchOfLikes.isEmpty()) return;
-        
-        Map<String, List<ReactionEvent>> finalBatchOfLikes = likesRepository.filterAlreadyLikedEvents(filteredBatchOfLikes);
 
-        if (finalBatchOfLikes.isEmpty()) return;
+        Map<String, Long> postsDelta = likesRepository.insertBatchOfLikeAndLikesCount(filteredBatchOfLikes);
 
-        likesRepository.insertBatchOfLikeAndLikesCount(finalBatchOfLikes);
+        likeStateCache.syncLikesBatchAndLikesCount(filteredBatchOfLikes, postsDelta);
 
-        likeStateCache.syncLikesBatchAndLikesCount(finalBatchOfLikes);
-
-        int totalProcessed = finalBatchOfLikes.values().stream().mapToInt(List::size).sum();
-        log.info("[likes-processor] Successfully processed {} like events across {} posts", totalProcessed, finalBatchOfLikes.size());
+        long totalProcessed = postsDelta.values().stream().mapToLong(Long::longValue).sum();
+        log.info("[likes-processor] Successfully inserted {} new likes across {} posts", totalProcessed, postsDelta.size());
     }
 
     /**
-     * Filters unlike events by checking against Redis like state cache and then against DB like state.
-     * Inserts the filtered unlike events into the database and updates the like count of the posts.
+     * Filters unlike events by checking against Redis like state cache.
+     * Deletes the filtered unlike events from the database and updates the like count of the posts.
      * Synchronizes the filtered unlike events to Redis like state cache.
      * @param unlikeEvents List of unlike events to process
      */
@@ -116,17 +110,13 @@ public class LikesBatchProcessor {
         Map<String, List<ReactionEvent>> filteredBatchOfUnlikes = likeStateCache.excludeExistingUnlikedEvents(unlikesByPostId);
 
         if (filteredBatchOfUnlikes.isEmpty()) return;
-        
-        Map<String, List<ReactionEvent>> finalBatchOfUnlikes = likesRepository.discardOrphanedUnlikes(filteredBatchOfUnlikes);
 
-        if (finalBatchOfUnlikes.isEmpty()) return;
+        Map<String, Long> actualCounts = likesRepository.deleteBatchOfUnlikeAndLikesCount(filteredBatchOfUnlikes);
 
-        likesRepository.deleteBatchOfUnlikeAndLikesCount(finalBatchOfUnlikes);
+        likeStateCache.syncUnlikesBatchAndLikesCount(filteredBatchOfUnlikes, actualCounts);
 
-        likeStateCache.syncUnlikesBatchAndLikesCount(finalBatchOfUnlikes);
-
-        int totalProcessed = finalBatchOfUnlikes.values().stream().mapToInt(List::size).sum();
-        log.info("[unlikes-processor] Successfully processed {} unlike events across {} posts", totalProcessed, finalBatchOfUnlikes.size());
+        long totalProcessed = actualCounts.values().stream().mapToLong(Long::longValue).sum();
+        log.info("[unlikes-processor] Successfully deleted {} likes across {} posts", totalProcessed, actualCounts.size());
     }
 
     /**

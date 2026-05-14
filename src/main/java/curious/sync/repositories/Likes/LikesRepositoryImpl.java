@@ -90,11 +90,12 @@ public class LikesRepositoryImpl implements ILikesRepository {
      * Inserts likes and increments post like counts in a single DB trip.
      *
      * @param events Map of postId to list of ReactionEvents to insert
+     * @return Map of postId → actual number of new likes inserted
      */
     @Override
-    public void insertBatchOfLikeAndLikesCount(Map<String, List<ReactionEvent>> events) {
+    public Map<String, Long> insertBatchOfLikeAndLikesCount(Map<String, List<ReactionEvent>> events) {
         if (events == null || events.isEmpty()) {
-            return;
+            return Map.of();
         }
 
         List<ReactionEvent> allEvents = events.values().stream()
@@ -124,19 +125,31 @@ public class LikesRepositoryImpl implements ILikesRepository {
                     WHERE post_id IN (SELECT post_id FROM counts)
                     ORDER BY post_id
                     FOR UPDATE
+                ),
+                do_update AS (
+                    UPDATE posts
+                    SET total_likes = total_likes + counts.like_count
+                    FROM counts
+                    WHERE posts.post_id = counts.post_id
+                    AND EXISTS (SELECT 1 FROM lock_rows WHERE lock_rows.post_id = posts.post_id)
                 )
-                UPDATE posts
-                SET total_likes = total_likes + counts.like_count
-                FROM counts
-                WHERE posts.post_id = counts.post_id
-                AND EXISTS (SELECT 1 FROM lock_rows WHERE lock_rows.post_id = posts.post_id)
+                SELECT post_id, like_count FROM counts
                 """;
 
-        jdbcTemplate.execute(sql, (PreparedStatement preparedStatement) -> {
-            Connection connection = preparedStatement.getConnection();
-            preparedStatement.setArray(1, connection.createArrayOf("text", userIds));
-            preparedStatement.setArray(2, connection.createArrayOf("text", postIds));
-            return preparedStatement.executeUpdate();
+        return jdbcTemplate.execute((Connection connection) -> {
+            try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+                preparedStatement.setArray(1, connection.createArrayOf("text", userIds));
+                preparedStatement.setArray(2, connection.createArrayOf("text", postIds));
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    Map<String, Long> actualCounts = new HashMap<>();
+                    while (resultSet.next()) {
+                        actualCounts.put(resultSet.getString("post_id"), resultSet.getLong("like_count"));
+                    }
+                    return actualCounts;
+                }
+            } catch (SQLException error) {
+                throw new RuntimeException("Error inserting batch of likes", error);
+            }
         });
     }
 
@@ -196,10 +209,16 @@ public class LikesRepositoryImpl implements ILikesRepository {
         return filteredEvents;
     }
 
+    /**
+     * Deletes likes and decrements post like counts.
+     *
+     * @param unlikesEvent Map of postId to list of ReactionEvents to delete
+     * @return Map of postId → actual number of likes deleted
+     */
     @Override
-    public void deleteBatchOfUnlikeAndLikesCount(Map<String, List<ReactionEvent>> unlikesEvent) {
+    public Map<String, Long> deleteBatchOfUnlikeAndLikesCount(Map<String, List<ReactionEvent>> unlikesEvent) {
         if (unlikesEvent == null || unlikesEvent.isEmpty()) {
-            return;
+            return Map.of();
         }
         
         List<ReactionEvent> allEvents = unlikesEvent.values().stream()
@@ -233,19 +252,31 @@ public class LikesRepositoryImpl implements ILikesRepository {
                     WHERE post_id IN (SELECT post_id FROM counts)
                     ORDER BY post_id
                     FOR UPDATE
+                ),
+                do_update AS (
+                    UPDATE posts
+                    SET total_likes = GREATEST(total_likes - counts.unlike_count, 0)
+                    FROM counts
+                    WHERE posts.post_id = counts.post_id
+                    AND EXISTS (SELECT 1 FROM lock_rows WHERE lock_rows.post_id = posts.post_id)
                 )
-                UPDATE posts
-                SET total_likes = total_likes - counts.unlike_count
-                FROM counts
-                WHERE posts.post_id = counts.post_id
-                AND EXISTS (SELECT 1 FROM lock_rows WHERE lock_rows.post_id = posts.post_id)
+                SELECT post_id, unlike_count FROM counts
                 """;
 
-        jdbcTemplate.execute(sql, (PreparedStatement preparedStatement) -> {
-            Connection connection = preparedStatement.getConnection();
-            preparedStatement.setArray(1, connection.createArrayOf("text", userIds));
-            preparedStatement.setArray(2, connection.createArrayOf("text", postIds));
-            return preparedStatement.executeUpdate();
+        return jdbcTemplate.execute((Connection connection) -> {
+            try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+                preparedStatement.setArray(1, connection.createArrayOf("text", userIds));
+                preparedStatement.setArray(2, connection.createArrayOf("text", postIds));
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    Map<String, Long> actualCounts = new HashMap<>();
+                    while (resultSet.next()) {
+                        actualCounts.put(resultSet.getString("post_id"), resultSet.getLong("unlike_count"));
+                    }
+                    return actualCounts;
+                }
+            } catch (SQLException error) {
+                throw new RuntimeException("Error deleting batch of unlikes", error);
+            }
         });
     }
 }
