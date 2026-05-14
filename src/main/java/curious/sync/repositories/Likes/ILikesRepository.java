@@ -12,9 +12,10 @@ public interface ILikesRepository {
     Map<String, List<ReactionEvent>> filterAlreadyLikedEvents(Map<String, List<ReactionEvent>> events);
 
     /**
-     * Inserts the given batch of like events into the database and updates the like count of the posts
+     * Inserts the given batch of like events into the database and updates the like count of the posts.
+     * Returns a map of postId → actual number of NEW likes inserted (excluding ON CONFLICT duplicates).
      */
-    void insertBatchOfLikeAndLikesCount(Map<String, List<ReactionEvent>> events);
+    Map<String, Long> insertBatchOfLikeAndLikesCount(Map<String, List<ReactionEvent>> events);
 
     /**
      * Removes events from the batch if the user has already unliked the post.
@@ -22,7 +23,8 @@ public interface ILikesRepository {
     Map<String, List<ReactionEvent>> discardOrphanedUnlikes(Map<String, List<ReactionEvent>> events);
 
     /**
-     * Removes the given batch of unlike events from the database and updates the like count of the posts
+     * Removes the given batch of unlike events from the database and updates the like count of the posts.
+     * Returns a map of postId → actual number of likes deleted.
      */
-    void deleteBatchOfUnlikeAndLikesCount(Map<String, List<ReactionEvent>> unlikesEvent);
+    Map<String, Long> deleteBatchOfUnlikeAndLikesCount(Map<String, List<ReactionEvent>> unlikesEvent);
 }
