@@ -182,50 +182,6 @@ public class LikeStateCache {
         });
     }
 
-    public Map<String, List<ReactionEvent>> excludeExistingUnlikedEvents(Map<String, List<ReactionEvent>> eventsByPostId) {
-        if (eventsByPostId == null || eventsByPostId.isEmpty()) {
-            return eventsByPostId;
-        }
-
-        List<String> orderedPostIds = new ArrayList<>(eventsByPostId.keySet());
-
-        List<Object> pipelineResults = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-            for (String postId : orderedPostIds) {
-                String redisKey = KeyUtils.getRedisStateKey(LIKE_STATE_CACHE, postId);
-
-                byte[][] userIds = eventsByPostId.get(postId).stream()
-                        .map(event -> event.getUserId().getBytes(StandardCharsets.UTF_8))
-                        .toArray(byte[][]::new);
-
-                connection.sMIsMember(redisKey.getBytes(StandardCharsets.UTF_8), userIds);
-            }
-            return null;
-        });
-
-        Set<String> eventsToRemove = new HashSet<>();
-
-        for (int postIdIterator = 0; postIdIterator < orderedPostIds.size(); postIdIterator++) {
-            String postId = orderedPostIds.get(postIdIterator);
-            List<ReactionEvent> eventsForPost = eventsByPostId.get(postId);
-
-            @SuppressWarnings("unchecked")
-            List<Boolean> membershipResults = (List<Boolean>) pipelineResults.get(postIdIterator);
-
-            for (int eventIterator = 0; eventIterator < eventsForPost.size(); eventIterator++) {
-                if (Boolean.FALSE.equals(membershipResults.get(eventIterator))) {
-                    ReactionEvent event = eventsForPost.get(eventIterator);
-                    eventsToRemove.add(KeyUtils.generateUserPostKey(event.getUserId(), event.getPostId()));
-                }
-            }
-        }
-
-        eventsByPostId.values().forEach(eventList -> eventList.removeIf(
-                event -> eventsToRemove.contains(KeyUtils.generateUserPostKey(event.getUserId(), event.getPostId()))));
-
-        eventsByPostId.entrySet().removeIf(entry -> entry.getValue().isEmpty());
-
-        return eventsByPostId;
-    }
 
     public void syncUnlikesBatchAndLikesCount(Map<String, List<ReactionEvent>> unlikesEvent, Map<String, Long> postsDelta) {
         if (unlikesEvent == null || unlikesEvent.isEmpty()) return;

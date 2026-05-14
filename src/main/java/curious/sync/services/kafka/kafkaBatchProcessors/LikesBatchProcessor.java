@@ -107,16 +107,12 @@ public class LikesBatchProcessor {
         List<ReactionEvent> filteredUnlikeEvents = filterDuplicateEvents(unlikeEvents);
         Map<String, List<ReactionEvent>> unlikesByPostId = mapEventsByPostId(filteredUnlikeEvents);
 
-        Map<String, List<ReactionEvent>> filteredBatchOfUnlikes = likeStateCache.excludeExistingUnlikedEvents(unlikesByPostId);
+        Map<String, Long> postsDelta = likesRepository.deleteBatchOfUnlikeAndLikesCount(unlikesByPostId);
 
-        if (filteredBatchOfUnlikes.isEmpty()) return;
+        likeStateCache.syncUnlikesBatchAndLikesCount(unlikesByPostId, postsDelta);
 
-        Map<String, Long> actualCounts = likesRepository.deleteBatchOfUnlikeAndLikesCount(filteredBatchOfUnlikes);
-
-        likeStateCache.syncUnlikesBatchAndLikesCount(filteredBatchOfUnlikes, actualCounts);
-
-        long totalProcessed = actualCounts.values().stream().mapToLong(Long::longValue).sum();
-        log.info("[unlikes-processor] Successfully deleted {} likes across {} posts", totalProcessed, actualCounts.size());
+        long totalProcessed = postsDelta.values().stream().mapToLong(Long::longValue).sum();
+        log.info("[unlikes-processor] Successfully deleted {} likes across {} posts", totalProcessed, postsDelta.size());
     }
 
     /**
