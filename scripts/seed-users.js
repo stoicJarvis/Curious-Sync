@@ -20,7 +20,7 @@ if (!process.env.DATABASE_HOST && DATABASE_URL) {
   }
 }
 
-const TOTAL = 10;
+const TOTAL = 1000000;
 
 const FIRST_NAMES = [
   "James","Mary","Robert","Patricia","John","Jennifer","Michael","Linda",
@@ -70,10 +70,11 @@ function main() {
     const first = pick(FIRST_NAMES);
     const last = pick(LAST_NAMES);
     const name = `${first} ${last}`;
+    const username = `${first.toLowerCase()}_${last.toLowerCase()}_${i}`;
     const email = `${first.toLowerCase()}.${last.toLowerCase()}${i}@${pick(DOMAINS)}`;
     const password = `${first.charAt(0)}${last}${Math.floor(Math.random() * 9999)}!`;
     
-    writeStream.write(`${name},${email},${password}\n`);
+    writeStream.write(`${name},${username},${email},${password}\n`);
     
     if (i % TOTAL === 0) console.log(`  Generated ${i.toLocaleString()} rows...`);
   }
@@ -85,7 +86,7 @@ function main() {
     
     // The Magic Command: COPY
     // We use STDIN so we don't have permission issues with the Postgres user reading our local file
-    const copyCmd = `psql -h ${HOST} -p ${PORT} -U ${USER} -d "${DB}" -c "\\copy users(name, email, password) FROM '${CSV_PATH}' WITH DELIMITER ',' CSV"`;
+    const copyCmd = `psql -h ${HOST} -p ${PORT} -U ${USER} -d "${DB}" -c "\\copy users(name, username, email, password) FROM '${CSV_PATH}' WITH DELIMITER ',' CSV"`;
     
     try {
       execSync(copyCmd, { env: { ...process.env, PGPASSWORD: PASSWORD }, stdio: "inherit" });
