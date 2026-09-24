@@ -16,13 +16,24 @@ public class UsersService {
     @Autowired
     UsersRepository usersRepository;
 
+    @Autowired
+    BloomFilterService bloomFilterService;
+
     public User createUser(User userToCreate) {
-        return usersRepository.save(userToCreate);
+        User created = usersRepository.save(userToCreate);
+        if (created.getUsername() != null) {
+            bloomFilterService.addUsernameToFilter(created.getUsername());
+        }
+        return created;
     }
 
     public User getUser(String userId) {
         return usersRepository.findById(userId)
                 .orElseThrow(
                         () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: " + userId));
+    }
+
+    public boolean isUsernameAvailable(String username) {
+        return usersRepository.findByUsername(username).isEmpty();
     }
 }
