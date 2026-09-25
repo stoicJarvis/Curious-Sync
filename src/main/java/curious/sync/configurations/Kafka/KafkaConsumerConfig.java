@@ -15,6 +15,7 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 
 import curious.sync.models.Events.ReactionEvent;
@@ -53,7 +54,12 @@ public class KafkaConsumerConfig {
         deserializer.addTrustedPackages("curious.sync.models.Events.*");
         deserializer.setUseTypeMapperForKey(false);
 
-        return new DefaultKafkaConsumerFactory<>(config, new StringDeserializer(), deserializer);
+        // WRAP your JsonDeserializer in an ErrorHandlingDeserializer
+        ErrorHandlingDeserializer<ReactionEvent> errorHandlingDeserializer = 
+                new ErrorHandlingDeserializer<>(deserializer);
+
+        // Pass the errorHandlingDeserializer to the factory
+        return new DefaultKafkaConsumerFactory<>(config, new StringDeserializer(), errorHandlingDeserializer);
     }
 
     @Bean

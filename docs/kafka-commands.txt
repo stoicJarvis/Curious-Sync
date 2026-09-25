@@ -7,8 +7,9 @@ KAFKA_CLUSTER_ID=$(bin/kafka-storage.sh random-uuid)
 2. Format storage
 bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/server.properties --standalone
 
-3. Start the server
-bin/kafka-server-start.sh config/server.properties
+3. Start/Stop the server
+    start - bin/kafka-server-start.sh config/server.properties
+    stop - bin/kafka-server-stop.sh
 
 4. Create topics with 12 partitions (12 partitions = 12 consumer threads can work fully in parallel)
 bin/kafka-topics.sh --create --topic like   --bootstrap-server localhost:9092 --partitions 12 --replication-factor 1

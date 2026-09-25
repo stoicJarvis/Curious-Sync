@@ -8,8 +8,10 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import curious.sync.models.Events.ReactionEvent;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 public class ReactionEventProducer {
 
     @Autowired
@@ -20,6 +22,7 @@ public class ReactionEventProducer {
      */
     public void sendLikeEvent(ReactionEvent reactionEvent) {
         kafkaTemplate.send(LIKE_EVENT, reactionEvent.getPostId(), reactionEvent);
+        log.debug("Like event queued — user={} post={}", reactionEvent.getUserId(), reactionEvent.getPostId());
     }
 
     /**
