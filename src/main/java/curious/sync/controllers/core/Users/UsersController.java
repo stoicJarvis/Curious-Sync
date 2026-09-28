@@ -1,4 +1,4 @@
-package curious.sync.controllers.core;
+package curious.sync.controllers.core.Users;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import curious.sync.models.core.User;
-import curious.sync.services.core.UsersService;
+import curious.sync.models.core.postgres.Users.User;
+import curious.sync.services.core.Users.UsersService;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j

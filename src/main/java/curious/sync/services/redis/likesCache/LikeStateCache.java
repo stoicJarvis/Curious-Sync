@@ -16,7 +16,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import curious.sync.models.Events.ReactionEvent;
-import curious.sync.repositories.PostsRepository;
+import curious.sync.repositories.postgres.Posts.PostsRepository;
 import curious.sync.utils.KeyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

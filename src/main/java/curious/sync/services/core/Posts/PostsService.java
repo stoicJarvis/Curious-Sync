@@ -1,4 +1,4 @@
-package curious.sync.services.core;
+package curious.sync.services.core.Posts;
 
 import java.time.Duration;
 
@@ -8,8 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import curious.sync.configurations.RequestCoalescer.RequestCoalescer;
-import curious.sync.models.core.Post;
-import curious.sync.repositories.PostsRepository;
+import curious.sync.models.core.postgres.Posts.Post;
+import curious.sync.repositories.postgres.Posts.PostsRepository;
 import curious.sync.services.redis.likesCache.LikeStateCache;
 import lombok.extern.slf4j.Slf4j;
 

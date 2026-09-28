@@ -1,4 +1,4 @@
-package curious.sync.services.core;
+package curious.sync.services.core.Likes;
 
 import static curious.sync.constants.Strings.LIKE_EVENT;
 

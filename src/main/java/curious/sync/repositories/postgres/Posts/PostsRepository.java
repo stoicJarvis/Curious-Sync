@@ -1,4 +1,4 @@
-package curious.sync.repositories;
+package curious.sync.repositories.postgres.Posts;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import curious.sync.models.core.Post;
+import curious.sync.models.core.postgres.Posts.Post;
 
 @Repository
 public interface PostsRepository extends JpaRepository<Post, String> {
