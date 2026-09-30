@@ -11,7 +11,7 @@ The system follows a reactive producer-consumer pattern to decouple API requests
 1.  **Ingestion Layer**: `LikesController` receives reaction events and immediately hands them off to Kafka.
 2.  **Streaming Layer**: **Apache Kafka** acts as the high-throughput message broker.
 3.  **Caching Layer**: **Redis** provides a high-speed state cache (`LikeStateCache`) to coalesce rapid-fire updates from the same user.
-4.  **Processing Layer**: `LikesBatchProcessor` consumes events in large windows and performs bulk database operations.
+4.  **Processing Layer**: `ReactionsBatchProcessor` consumes events in large windows and performs bulk database operations.
 5.  **Persistence Layer**: **PostgreSQL** stores the final state.
 
 ---
@@ -21,7 +21,7 @@ The system follows a reactive producer-consumer pattern to decouple API requests
 - **Backend**: Java 21 / Spring Boot 4.0.5
 - **Message Broker**: Apache Kafka
 - **Caching**: Redis
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL, ScyllaDB
 - **Build Tool**: Gradle
 - **Utilities**: Node.js
 - **Testing**: k6
@@ -36,6 +36,7 @@ The system follows a reactive producer-consumer pattern to decouple API requests
 - **Redis Cloud Acconut**
 - **Kafak locally installed**
 - **Postgres locally installed**
+- **ScyllaDB locally installed**
 - **Node.js** (for auxiliary scripts)
 
 ### Configuration

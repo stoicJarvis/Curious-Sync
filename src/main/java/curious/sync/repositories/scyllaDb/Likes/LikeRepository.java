@@ -13,9 +13,9 @@ import curious.sync.models.core.scyllaDb.Like.LikeKey;
 @Repository
 public interface LikeRepository extends CassandraRepository<Like, LikeKey> {
 
-    @Query("SELECT * FROM post_likes WHERE post_id = ?0")
+    @Query("SELECT * FROM post_likes WHERE postId = ?0")
     List<Like> getUserLikesForPost(UUID postId);
 
-    @Query("SELECT count(*) > 0 FROM post_likes WHERE post_id = ?0 AND user_id = ?1")
+    @Query("SELECT count(*) > 0 FROM post_likes WHERE postId = ?0 AND userId = ?1")
     boolean hasUserLiked(UUID postId, UUID userId);
 }

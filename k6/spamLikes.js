@@ -53,8 +53,8 @@ export default function () {
   const userId = users[iterationIdx];
 
   const payload = JSON.stringify({
-    user_id: userId,
-    post_id: POST_ID,
+    userId: userId,
+    postId: POST_ID,
   });
 
   const params = {

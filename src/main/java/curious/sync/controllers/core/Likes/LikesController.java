@@ -1,7 +1,6 @@
 package curious.sync.controllers.core.Likes;
 
 import java.util.Map;
-import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,24 +9,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import curious.sync.services.core.Likes.LikesService;
-import curious.sync.services.core.Posts.PostsService;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/like")
-public class LikeController {
+public class LikesController {
 
     @Autowired
     LikesService likesService;
 
-    @Autowired
-    PostsService postsService;
-
     @PostMapping("/")
-    public Map<String, Object> react(@RequestBody Map<String, String> requestBody) {
-        UUID userId = UUID.fromString(requestBody.get("user_id"));
-        UUID postId = UUID.fromString(requestBody.get("post_id"));
+    public Map<String, Object> like(@RequestBody Map<String, String> requestBody) {
+        Long userId = Long.parseLong(requestBody.get("userId"));
+        Long postId = Long.parseLong(requestBody.get("postId"));
 
         log.info("POST /api/likes/react - user: {} reacting on post: {}", userId, postId);
 

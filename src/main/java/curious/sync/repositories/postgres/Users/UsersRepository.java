@@ -6,6 +6,6 @@ import org.springframework.stereotype.Repository;
 import curious.sync.models.core.postgres.Users.User;
 
 @Repository
-public interface UsersRepository extends JpaRepository<User, String> {
+public interface UsersRepository extends JpaRepository<User, Long> {
     
 }

@@ -2,7 +2,6 @@ package curious.sync.models.core.scyllaDb.Like;
 
 import java.io.Serializable;
 import java.util.Objects;
-import java.util.UUID;
 
 import org.springframework.data.cassandra.core.cql.PrimaryKeyType;
 import org.springframework.data.cassandra.core.mapping.PrimaryKeyClass;
@@ -15,29 +14,29 @@ import lombok.Builder;
 public class LikeKey implements Serializable {
 
     @PrimaryKeyColumn(name = "postId", type = PrimaryKeyType.PARTITIONED, ordinal = 0)
-    private UUID postId;
+    private Long postId;
 
     @PrimaryKeyColumn(name = "userId", type = PrimaryKeyType.CLUSTERED, ordinal = 1)
-    private UUID userId;
+    private Long userId;
 
-    public LikeKey(UUID postId, UUID userId) {
+    public LikeKey(Long postId, Long userId) {
         this.postId = postId;
         this.userId = userId;
     }
 
-    public UUID getPostId() {
+    public Long getPostId() {
         return postId;
     }
 
-    public void setPostId(UUID postId) {
+    public void setPostId(Long postId) {
         this.postId = postId;
     }
 
-    public UUID getUserId() {
+    public Long getUserId() {
         return userId;
     }
 
-    public void setUserId(UUID userId) {
+    public void setUserId(Long userId) {
         this.userId = userId;
     }
 

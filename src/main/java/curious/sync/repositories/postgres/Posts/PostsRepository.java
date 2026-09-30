@@ -9,14 +9,14 @@ import org.springframework.stereotype.Repository;
 import curious.sync.models.core.postgres.Posts.Post;
 
 @Repository
-public interface PostsRepository extends JpaRepository<Post, String> {
+public interface PostsRepository extends JpaRepository<Post, Long> {
 
     /**
      * Atomically increments total_likes by `delta` for the given post.
      * Replaces the old read-modify-write pattern that caused race conditions.
      */
     @Modifying
-    @Query(value = "UPDATE posts SET total_likes = total_likes + :delta WHERE post_id = :postId",
+    @Query(value = "UPDATE posts SET total_likes = total_likes + :delta WHERE postId = :postId",
            nativeQuery = true)
     void incrementLikesBy(@Param("postId") String postId, @Param("delta") long delta);
 
@@ -25,7 +25,7 @@ public interface PostsRepository extends JpaRepository<Post, String> {
      * GREATEST prevents negative counts from stale events or race conditions.
      */
     @Modifying
-    @Query(value = "UPDATE posts SET total_likes = GREATEST(total_likes - :delta, 0) WHERE post_id = :postId",
+    @Query(value = "UPDATE posts SET total_likes = GREATEST(total_likes - :delta, 0) WHERE postId = :postId",
            nativeQuery = true)
     void decrementLikesBy(@Param("postId") String postId, @Param("delta") long delta);
 }

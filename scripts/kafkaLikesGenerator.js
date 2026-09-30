@@ -26,8 +26,8 @@ function runSQL(sql) {
 async function main() {
     console.log("Fetching users and posts from database...");
 
-    const userIds = runSQL("SELECT user_id FROM users LIMIT 10000").split("\n").filter(Boolean);
-    const postIds = runSQL("SELECT post_id FROM posts LIMIT 1000").split("\n").filter(Boolean);
+    const userIds = runSQL("SELECT userId FROM users LIMIT 10000").split("\n").filter(Boolean);
+    const postIds = runSQL("SELECT postId FROM posts LIMIT 1000").split("\n").filter(Boolean);
 
     if (userIds.length === 0 || postIds.length === 0) {
         console.error("No users or posts found in DB. Please run seed scripts first.");

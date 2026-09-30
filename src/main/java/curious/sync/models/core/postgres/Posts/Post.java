@@ -3,8 +3,6 @@ package curious.sync.models.core.postgres.Posts;
 import curious.sync.models.core.postgres.Users.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -19,17 +17,13 @@ import lombok.Setter;
 public class Post {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "post_id", columnDefinition = "varchar(255) DEFAULT gen_random_uuid()")
-    private String post_id;
+    @Column(name = "postId", columnDefinition = "BIGINT", nullable = false, updatable = false)
+    private Long postId;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "userId", nullable = false)
     private User user;
 
-    @Column
-    private long total_likes = 0;
-
-    @Column(nullable = false)
-    private String post_url;
+    @Column(name = "postUrl", nullable = false)
+    private String postUrl;
 }

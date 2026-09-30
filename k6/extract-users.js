@@ -19,7 +19,7 @@ const DB = process.env.DATABASE_NAME;
 const USER = process.env.DATABASE_USERNAME;
 const PASSWORD = process.env.DATABASE_PASSWORD;
 
-const sql = "SELECT user_id FROM users ORDER BY RANDOM() LIMIT 5000";
+const sql = "SELECT userId FROM users ORDER BY RANDOM() LIMIT 5000";
 const raw = execSync(
   `psql -h ${HOST} -p ${PORT} -U ${USER} -d "${DB}" -t -A -c "${sql}"`,
   { env: { ...process.env, PGPASSWORD: PASSWORD }, encoding: "utf-8" },

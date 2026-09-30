@@ -10,7 +10,7 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 import curious.sync.models.Events.ReactionEvent;
-import curious.sync.services.kafka.kafkaBatchProcessors.LikesBatchProcessor;
+import curious.sync.services.kafka.kafkaBatchProcessors.ReactionsBatchProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -20,8 +20,8 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class LikesConsumer {
-    private final LikesBatchProcessor likesBatchProcessor;
+public class ReactionEventConsumer {
+    private final ReactionsBatchProcessor likesBatchProcessor;
 
     /**
      * Batch consumes like events from Kafka topic and processes them.
@@ -29,10 +29,6 @@ public class LikesConsumer {
     @KafkaListener(topics = LIKE_EVENT, groupId = LIKES_PROCESSOR_GROUP, containerFactory = "kafkaListenerContainerFactory")
     public void consumeLikesBatch(@Payload List<ReactionEvent> likeEvents) {
         log.info("[like-consumer] Received batch of {} events", likeEvents.size());
-        try {
-            likesBatchProcessor.processBatchOfLikes(likeEvents);
-        } catch (Exception e) {
-            log.error("[like-consumer] Failed to process batch of {} events: {}", likeEvents.size(), e.getMessage(), e);
-        }
+        likesBatchProcessor.processBatchOfLikes(likeEvents);
     }
 }

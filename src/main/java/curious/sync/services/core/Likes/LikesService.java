@@ -3,7 +3,6 @@ package curious.sync.services.core.Likes;
 import static curious.sync.constants.Strings.LIKE_EVENT;
 
 import java.util.Map;
-import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
@@ -23,7 +22,7 @@ public class LikesService {
      /**
      * Adds like event in the Kafka topic and returns the event type immediately
      */
-    public Map<String, Object> likePost(UUID userId, UUID postId) {
+    public Map<String, Object> likePost(Long userId, Long postId) {
 
         ReactionEvent event = ReactionEvent.builder()
                 .postId(postId)
@@ -33,6 +32,6 @@ public class LikesService {
 
         reactionEventProducer.sendLikeEvent(event);
 
-        return Map.of("action", LIKE_EVENT, "post_id", postId);
+        return Map.of("action", LIKE_EVENT, "postId", postId);
     }
 }

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import curious.sync.models.core.scyllaDb.Like.LikesCount;
 
 @Repository
-public interface LikesCountRepository extends CassandraRepository<LikesCount, UUID> {
+public interface LikesCountRepository extends CassandraRepository<LikesCount, Long> {
 
     // Bulk increment of likes
     @Query("UPDATE likesCount SET count = count + ?1 WHERE postId = ?0")
