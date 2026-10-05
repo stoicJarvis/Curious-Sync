@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RequiredArgsConstructor
 public class ReactionEventConsumer {
-    private final ReactionsBatchProcessor likesBatchProcessor;
+    private final ReactionsBatchProcessor reactionsBatchProcessor;
 
     /**
      * Batch consumes like events from Kafka topic and processes them.
@@ -29,6 +29,6 @@ public class ReactionEventConsumer {
     @KafkaListener(topics = LIKE_EVENT, groupId = LIKES_PROCESSOR_GROUP, containerFactory = "kafkaListenerContainerFactory")
     public void consumeLikesBatch(@Payload List<ReactionEvent> likeEvents) {
         log.info("[like-consumer] Received batch of {} events", likeEvents.size());
-        likesBatchProcessor.processBatchOfLikes(likeEvents);
+        reactionsBatchProcessor.processBatchOfLikes(likeEvents);
     }
 }
