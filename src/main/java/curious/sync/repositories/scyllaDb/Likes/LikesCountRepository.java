@@ -27,4 +27,8 @@ public interface LikesCountRepository extends CassandraRepository<LikesCount, Lo
     default void decrementByOne(UUID postId) {
         decrementCount(postId, 1L);
     }
+
+    default long getLikesCount(Long postId) {
+        return findById(postId).map(LikesCount::getLikesCount).orElse(0L);
+    }
 }

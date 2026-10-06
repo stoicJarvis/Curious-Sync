@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import curious.sync.services.core.Likes.LikesService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
 
 @Slf4j
 @RestController
@@ -30,4 +33,12 @@ public class LikesController {
 
         return result;
     }
+
+    @GetMapping("/getLikes")
+    public long getLikesCount(@RequestParam String postId) {
+        Long post = Long.parseLong(postId);
+
+        return likesService.getLikesCount(post);
+    }
+    
 }
