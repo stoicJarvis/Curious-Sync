@@ -1,133 +1,181 @@
+const fs = require('fs');
 const { execSync } = require("child_process");
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const DB = process.env.DATABASE_NAME;
-const USER = process.env.DATABASE_USERNAME;
-const PASSWORD = process.env.DATABASE_PASSWORD;
-const DATABASE_URL = process.env.DATABASE_URL;
-let HOST = process.env.DATABASE_HOST;
-let PORT = process.env.DATABASE_PORT;
+// ==========================================
+// CONFIGURATION
+// ==========================================
+const CONFIG = {
+  db: {
+    name: process.env.DATABASE_NAME,
+    user: process.env.DATABASE_USERNAME,
+    password: process.env.DATABASE_PASSWORD,
+    url: process.env.DATABASE_URL,
+    host: process.env.DATABASE_HOST || 'localhost',
+    port: process.env.DATABASE_PORT || '5432'
+  },
+  seeder: {
+    totalPosts: 1000000,
+    csvPath: path.join(__dirname, "posts_data.csv"),
+    logInterval: 100000 // Log progress every 100,000 rows
+  },
+  snowflake: {
+    epoch: 1790640000000n, 
+    nodeId: 3n,
+    nodeBits: 10n,
+    sequenceBits: 12n
+  }
+};
 
-if (!process.env.DATABASE_HOST && DATABASE_URL) {
+// Fallback logic for DB Host/Port from URL
+if (!process.env.DATABASE_HOST && CONFIG.db.url) {
   try {
-    const url = new URL(DATABASE_URL.replace(/^jdbc:/, ''));
-    HOST = url.hostname || HOST;
-    PORT = url.port || PORT;
-  } catch (err) {
-    // fall back to defaults
+    const url = new URL(CONFIG.db.url.replace(/^jdbc:/, ''));
+    CONFIG.db.host = url.hostname || CONFIG.db.host;
+    CONFIG.db.port = url.port || CONFIG.db.port;
+  } catch (err) {}
+}
+
+// ==========================================
+// SNOWFLAKE GENERATOR
+// ==========================================
+class SnowflakeGenerator {
+  constructor(epoch, nodeId, nodeBits, sequenceBits) {
+    this.epoch = epoch;
+    this.nodeId = nodeId;
+    this.sequenceBits = sequenceBits;
+    this.nodeShift = sequenceBits;
+    this.timestampShift = sequenceBits + nodeBits;
+    this.maxSequence = (1n << sequenceBits) - 1n; // 4095
+    this.sequence = 0n;
+    this.lastTimestamp = -1n;
+  }
+
+  nextId() {
+    let currentTimestamp = BigInt(Date.now());
+    if (currentTimestamp < this.lastTimestamp) throw new Error("Clock moved backwards!");
+    
+    if (currentTimestamp === this.lastTimestamp) {
+      this.sequence = (this.sequence + 1n) & this.maxSequence;
+      if (this.sequence === 0n) {
+        while (currentTimestamp <= this.lastTimestamp) currentTimestamp = BigInt(Date.now());
+      }
+    } else {
+      this.sequence = 0n;
+    }
+    
+    this.lastTimestamp = currentTimestamp;
+    return ((currentTimestamp - this.epoch) << this.timestampShift) | (this.nodeId << this.nodeShift) | this.sequence;
   }
 }
 
+// Data Pool
 const POST_URLS = [
-  "https://curious-sync.app/p/exploring-the-cosmos",
-  "https://curious-sync.app/p/deep-sea-mysteries",
-  "https://curious-sync.app/p/quantum-computing-101",
-  "https://curious-sync.app/p/urban-gardening-tips",
-  "https://curious-sync.app/p/history-of-jazz",
-  "https://curious-sync.app/p/machine-learning-basics",
-  "https://curious-sync.app/p/photography-at-golden-hour",
-  "https://curious-sync.app/p/best-hiking-trails-2026",
-  "https://curious-sync.app/p/sourdough-bread-recipe",
-  "https://curious-sync.app/p/minimalist-home-design",
-  "https://curious-sync.app/p/electric-vehicles-future",
-  "https://curious-sync.app/p/yoga-for-beginners",
-  "https://curious-sync.app/p/indie-game-development",
-  "https://curious-sync.app/p/sustainable-fashion",
-  "https://curious-sync.app/p/psychology-of-habits",
-  "https://curious-sync.app/p/street-food-around-world",
-  "https://curious-sync.app/p/climate-change-solutions",
-  "https://curious-sync.app/p/guitar-chord-progressions",
-  "https://curious-sync.app/p/remote-work-productivity",
-  "https://curious-sync.app/p/ancient-roman-architecture",
-  "https://curious-sync.app/p/coffee-brewing-methods",
-  "https://curious-sync.app/p/understanding-blockchain",
-  "https://curious-sync.app/p/watercolor-painting-intro",
-  "https://curious-sync.app/p/marathon-training-plan",
-  "https://curious-sync.app/p/diy-home-automation",
-  "https://curious-sync.app/p/origami-art-tutorial",
-  "https://curious-sync.app/p/astrophotography-guide",
-  "https://curious-sync.app/p/vegan-meal-prep-ideas",
-  "https://curious-sync.app/p/film-noir-classics",
-  "https://curious-sync.app/p/startup-funding-guide",
-  "https://curious-sync.app/p/bonsai-care-basics",
-  "https://curious-sync.app/p/typescript-best-practices",
-  "https://curious-sync.app/p/sleep-science-explained",
-  "https://curious-sync.app/p/vintage-vinyl-collecting",
-  "https://curious-sync.app/p/rock-climbing-fundamentals",
-  "https://curious-sync.app/p/creative-writing-prompts",
-  "https://curious-sync.app/p/fermentation-at-home",
-  "https://curious-sync.app/p/cybersecurity-essentials",
-  "https://curious-sync.app/p/japanese-woodworking",
-  "https://curious-sync.app/p/backpacking-southeast-asia",
-  "https://curious-sync.app/p/digital-illustration-tips",
-  "https://curious-sync.app/p/meditation-for-focus",
-  "https://curious-sync.app/p/open-source-contributions",
-  "https://curious-sync.app/p/chess-openings-guide",
-  "https://curious-sync.app/p/tiny-house-living",
-  "https://curious-sync.app/p/podcast-production-101",
-  "https://curious-sync.app/p/ocean-conservation",
-  "https://curious-sync.app/p/3d-printing-projects",
-  "https://curious-sync.app/p/philosophy-of-stoicism",
-  "https://curious-sync.app/p/modern-calligraphy",
+  "exploring-the-cosmos", "deep-sea-mysteries", "quantum-computing-101", "urban-gardening-tips",
+  "history-of-jazz", "machine-learning-basics", "photography-at-golden-hour", "best-hiking-trails",
+  "sourdough-bread-recipe", "minimalist-home-design", "electric-vehicles-future", "yoga-for-beginners",
+  "indie-game-development", "sustainable-fashion", "psychology-of-habits", "street-food-around-world"
 ];
 
+// Helper to run raw SQL
 function runSQL(sql) {
   return execSync(
-    `psql -h ${HOST} -p ${PORT} -U ${USER} -d "${DB}" -t -A -c "${sql.replace(/"/g, '\\"')}"`,
-    { env: { ...process.env, PGPASSWORD: PASSWORD }, encoding: "utf-8" }
+    `psql -h ${CONFIG.db.host} -p ${CONFIG.db.port} -U ${CONFIG.db.user} -d "${CONFIG.db.name}" -t -A -c "${sql}"`,
+    { 
+      env: { ...process.env, PGPASSWORD: CONFIG.db.password }, 
+      encoding: "utf-8",
+      maxBuffer: 10 * 1024 * 1024 // Increase buffer to 10 MB to hold all 100,000 IDs
+    }
   ).trim();
 }
 
+// ==========================================
+// MAIN EXECUTION
+// ==========================================
 function main() {
-  const args = process.argv.slice(2);
-  const N = parseInt(args[0] || process.env.N_POSTS || "10000", 10);
-
-  if (isNaN(N) || N <= 0) {
-    console.error("Please provide a valid positive number for N.");
+  console.log("Fetching up to 100,000 valid user IDs from the database...");
+  
+  // Fetch real users. 
+  // Using pure lowercase "userid" based on your previous fix.
+  let usersListStr;
+  try {
+    usersListStr = runSQL("SELECT userid FROM users LIMIT 100000");
+  } catch (err) {
+    console.error("❌ Failed to fetch users from database:");
+    if (err.stderr) {
+        console.error(err.stderr.toString());
+    } else {
+        console.error(err.message);
+    }
     process.exit(1);
   }
 
-  const userIds = runSQL("SELECT user_id FROM users ORDER BY RANDOM() LIMIT 100")
-    .split("\n")
-    .filter(Boolean);
+  // Safely clean up hidden \r characters and whitespace that corrupt the CSV
+  const userIds = usersListStr.split(/\r?\n/).map(id => id.trim()).filter(Boolean);
 
   if (userIds.length === 0) {
-    console.error("No users found. Run seed-users.js first.");
+    console.error("❌ No users found in the database. Please run seed-users.js first!");
     process.exit(1);
   }
 
-  console.log(`Found ${userIds.length} users. Preparing to seed ${N} posts with 0 likes...`);
-
-  const rows = [];
-  const urlCount = POST_URLS.length;
-
-  for (let i = 0; i < N; i++) {
-    const userId = userIds[i % userIds.length];
+  console.log(`Successfully loaded ${userIds.length} users.`);
+  console.log(`Generating CSV for ${CONFIG.seeder.totalPosts.toLocaleString()} posts...`);
+  
+  const start = Date.now();
+  const writeStream = fs.createWriteStream(CONFIG.seeder.csvPath);
+  const idGenerator = new SnowflakeGenerator(CONFIG.snowflake.epoch, CONFIG.snowflake.nodeId, CONFIG.snowflake.nodeBits, CONFIG.snowflake.sequenceBits);
+  
+  for (let i = 0; i < CONFIG.seeder.totalPosts; i++) {
+    const postId = idGenerator.nextId().toString();
     
-    // Construct URLs cleanly. If i >= 50, it appends unique numbers
-    const baseUrl = POST_URLS[i % urlCount];
-    const url = i < urlCount ? baseUrl : `${baseUrl}-${i + 1}`;
-
-    // Total likes is hardcoded to 0 here
-    rows.push(`(gen_random_uuid(),'${userId}',0,'${url}')`);
+    // Pick a random user from the real ones we fetched
+    const userId = userIds[Math.floor(Math.random() * userIds.length)];
     
-    // Performance Guard: Batch execute every 5000 records
-    if (rows.length === 5000) {
-      const sql = `INSERT INTO posts (post_id, user_id, total_likes, post_url) VALUES ${rows.join(",")};`;
-      runSQL(sql);
-      rows.length = 0; 
-      console.log(`Chunk processed... inserted up to row ${i + 1}`);
+    // Create a unique URL
+    const baseUrl = POST_URLS[i % POST_URLS.length];
+    const postUrl = `https://curious-sync.app/p/${baseUrl}-${i}`;
+    // COPY bypasses Hibernate; createdAt has no DB default, isDeleted is NOT NULL
+    const createdAt = new Date().toISOString();
+
+    // Write format: postId, userId, postUrl, createdAt, isDeleted
+    writeStream.write(`${postId},${userId},${postUrl},${createdAt},false\n`);
+    
+    if (i > 0 && i % CONFIG.seeder.logInterval === 0) {
+      console.log(`  Generated ${i.toLocaleString()} post rows...`);
     }
   }
+  
+  writeStream.end();
 
-  // Insert any remaining items left in the array
-  if (rows.length > 0) {
-    const sql = `INSERT INTO posts (post_id, user_id, total_likes, post_url) VALUES ${rows.join(",")};`;
-    runSQL(sql);
-  }
-
-  console.log(`Success! Inserted a total of ${N} posts with 0 default likes.`);
+  writeStream.on('finish', () => {
+    console.log("CSV Generated. Starting Postgres COPY...");
+    
+    // Postgres COPY command
+    // Ensure these columns match EXACTLY how they appear in your Postgres database.
+    // If your DB has user_id, change 'userid' to 'user_id' below.
+    const copyCmd = `psql -h ${CONFIG.db.host} -p ${CONFIG.db.port} -U ${CONFIG.db.user} -d "${CONFIG.db.name}" -c "\\copy posts(postid, userid, posturl, createdat, isdeleted) FROM '${CONFIG.seeder.csvPath}' WITH DELIMITER ',' CSV"`;
+    
+    try {
+      execSync(copyCmd, { env: { ...process.env, PGPASSWORD: CONFIG.db.password }, stdio: "inherit" });
+      const totalTime = ((Date.now() - start) / 1000).toFixed(1);
+      console.log(`✅ Done! ${CONFIG.seeder.totalPosts.toLocaleString()} posts handled in ${totalTime}s`);
+      
+      // Cleanup the 50MB+ CSV file
+      fs.unlinkSync(CONFIG.seeder.csvPath);
+      console.log("Cleaned up temporary CSV file.");
+    } catch (err) {
+      console.error("\n❌ Import failed!");
+      
+      // Clearly print the exact Postgres error instead of a giant buffer dump
+      if (err.stderr) {
+          console.error("--- POSTGRES ERROR DETAILS ---");
+          console.error(err.stderr.toString());
+      } else {
+          console.error(err.message);
+      }
+    }
+  });
 }
 
 main();

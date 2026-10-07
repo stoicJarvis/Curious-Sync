@@ -1,5 +1,6 @@
 package curious.sync.models.Events;
 
+import curious.sync.constants.ReactionAction;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -12,12 +13,12 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReactionEvent {
-    private String userId;
-    private String postId;
-    private String eventType;
+    private Long userId;
+    private Long postId;
+    private ReactionAction reactionAction;
 
     @Override
     public String toString() {
-        return this.eventType + " " + this.userId + " " + this.postId;
+        return this.reactionAction.toString() + " " + this.userId + " " + this.postId;
     }
 }

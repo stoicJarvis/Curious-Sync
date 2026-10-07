@@ -25,13 +25,13 @@ async function main() {
 
     // Export Users
     console.log("Fetching 100k user IDs...");
-    const userIds = runSQL("SELECT user_id FROM users LIMIT 100000").split("\n").filter(Boolean);
+    const userIds = runSQL("SELECT userId FROM users LIMIT 100000").split("\n").filter(Boolean);
     console.log(`Fetched ${userIds.length} users. Writing to file...`);
     fs.writeFileSync(usersPath, JSON.stringify(userIds));
     
     // Export Posts
     console.log("Fetching 2000 post IDs...");
-    const postIds = runSQL("SELECT post_id FROM posts LIMIT 2000").split("\n").filter(Boolean);
+    const postIds = runSQL("SELECT postId FROM posts LIMIT 2000").split("\n").filter(Boolean);
     console.log(`Fetched ${postIds.length} posts. Writing to file...`);
     fs.writeFileSync(postsPath, JSON.stringify(postIds));
 
