@@ -3,15 +3,15 @@ package curious.sync.controllers.core.Likes;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import curious.sync.services.core.Likes.LikesService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 
 
 @Slf4j
@@ -23,9 +23,9 @@ public class LikesController {
     LikesService likesService;
 
     @PostMapping("/")
-    public Map<String, Object> like(@RequestBody Map<String, String> requestBody) {
-        Long userId = Long.parseLong(requestBody.get("userId"));
-        Long postId = Long.parseLong(requestBody.get("postId"));
+    public Map<String, Object> like(@RequestBody Map<String, Long> requestBody) {
+        Long userId = requestBody.get("userId");
+        Long postId = requestBody.get("postId");
 
         log.info("POST /api/likes/react - user: {} reacting on post: {}", userId, postId);
 
@@ -35,10 +35,8 @@ public class LikesController {
     }
 
     @GetMapping("/getLikes")
-    public long getLikesCount(@RequestParam String postId) {
-        Long post = Long.parseLong(postId);
-
-        return likesService.getLikesCount(post);
+    public long getLikesCount(@RequestParam Long postId) {
+        return likesService.getLikesCount(postId);
     }
     
 }

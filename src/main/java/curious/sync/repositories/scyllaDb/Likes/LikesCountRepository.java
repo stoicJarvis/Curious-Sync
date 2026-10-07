@@ -1,6 +1,5 @@
 package curious.sync.repositories.scyllaDb.Likes;
 
-import java.util.UUID;
 import org.springframework.data.cassandra.repository.CassandraRepository;
 import org.springframework.data.cassandra.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -12,19 +11,19 @@ public interface LikesCountRepository extends CassandraRepository<LikesCount, Lo
 
     // Bulk increment of likes
     @Query("UPDATE likesCount SET count = count + ?1 WHERE postId = ?0")
-    void incrementCount(UUID postId, long incrementCountBy);
+    void incrementCount(Long postId, Long incrementCountBy);
 
     // Bulk decrement of likes
     @Query("UPDATE likesCount SET count = count - ?1 WHERE postId = ?0")
-    void decrementCount(UUID postId, long decrementCountBy);
+    void decrementCount(Long postId, Long decrementCountBy);
 
     // Single Increment
-    default void incrementByOne(UUID postId) {
+    default void incrementByOne(Long postId) {
         incrementCount(postId, 1L);
     }
 
     // Single Decrement
-    default void decrementByOne(UUID postId) {
+    default void decrementByOne(Long postId) {
         decrementCount(postId, 1L);
     }
 

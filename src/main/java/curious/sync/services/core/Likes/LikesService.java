@@ -4,16 +4,15 @@ import static curious.sync.constants.Strings.LIKE_EVENT;
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import curious.sync.configurations.RequestCoalescer.RequestCoalescer;
 import curious.sync.constants.ReactionAction;
 import curious.sync.models.Events.ReactionEvent;
 import curious.sync.repositories.scyllaDb.Likes.LikesCountRepository;
+import curious.sync.services.kafka.kafkaEventProducers.ReactionEventProducer;
 import curious.sync.utils.KeyUtils;
 import curious.sync.utils.SnowflakeUtils;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 public class LikesService {
 
     private final StringRedisTemplate redisTemplate;
-    private final KafkaTemplate<String, ReactionEvent> kafkaTemplate;
+    private final ReactionEventProducer reactionEventProducer;
     private final LikesCountRepository scyllaRepository;
 
     private final RequestCoalescer<Long> likesCountCoalescer = new RequestCoalescer<>("likes-count");
@@ -63,14 +62,7 @@ public class LikesService {
                     .reactionAction(ReactionAction.LIKE)
                     .build();
 
-            kafkaTemplate.send(LIKE_EVENT, event.getPostId(), event).get();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            rollbackRedisLike(likedByKey, countKey, userMember, userId, postId);
-            throw new IllegalStateException("Interrupted while publishing like event", e);
-        } catch (ExecutionException e) {
-            rollbackRedisLike(likedByKey, countKey, userMember, userId, postId);
-            throw new IllegalStateException("Failed to publish like event; Redis write rolled back", e.getCause());
+            reactionEventProducer.sendLikeEvent(event);
         } catch (RuntimeException e) {
             rollbackRedisLike(likedByKey, countKey, userMember, userId, postId);
             throw e;

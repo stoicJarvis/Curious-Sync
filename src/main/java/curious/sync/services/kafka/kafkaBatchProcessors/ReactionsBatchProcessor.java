@@ -61,8 +61,8 @@ public class ReactionsBatchProcessor {
                 // Block the loop if there are already 2048 queries waiting for the DB
                 inFlightLimiter.acquire();
 
-                long postId = Long.parseLong(event.getPostId());
-                long userId = Long.parseLong(event.getUserId());
+                long postId = event.getPostId();
+                long userId = event.getUserId();
 
                 // Bind directly to the pre-compiled binary statement
                 BoundStatement boundStatement = insertLikeStmt.bind(postId, userId);

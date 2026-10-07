@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.common.serialization.LongSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,11 +22,11 @@ public class KafkaProducerConfig {
     private String bootstrapServers;
 
     @Bean
-    ProducerFactory<String, ReactionEvent> producerFactory() {
+    ProducerFactory<Long, ReactionEvent> producerFactory() {
         Map<String, Object> config = new HashMap<>();
 
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, LongSerializer.class);
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
 
         // Batching
@@ -48,7 +48,7 @@ public class KafkaProducerConfig {
     }
 
     @Bean
-    KafkaTemplate<String, ReactionEvent> getKafkaTemplate() {
+    KafkaTemplate<Long, ReactionEvent> getKafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
 }

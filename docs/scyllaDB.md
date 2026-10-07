@@ -38,8 +38,8 @@
 7. create table
 ```
     CREATE TABLE post_likes (
-        postId uuid,
-        userId uuid,
+        postId bigint,
+        userId bigint,
         liked_at timestamp,
         PRIMARY KEY (postId, userId)
     );
@@ -53,13 +53,13 @@
 9. insert data
 ```
     INSERT INTO post_likes (postId, userId, liked_at)
-    VALUES (63200742-e1d5-472e-8367-bfeb43848123, 11111111-1111-1111-1111-111111111111, toTimestamp(now()));
+    VALUES (1930000000000000001, 1930000000000000101, toTimestamp(now()));
 
     INSERT INTO post_likes (postId, userId, liked_at)
-    VALUES (63200742-e1d5-472e-8367-bfeb43848123, 22222222-2222-2222-2222-222222222222, toTimestamp(now()));
+    VALUES (1930000000000000001, 1930000000000000102, toTimestamp(now()));
 ```
 
 10. select query
 ```
-    SELECT * FROM post_likes WHERE postId = 63200742-e1d5-472e-8367-bfeb43848123;
+    SELECT * FROM post_likes WHERE postId = 1930000000000000001;
 ```

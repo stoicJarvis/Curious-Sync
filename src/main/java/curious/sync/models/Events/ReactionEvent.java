@@ -17,16 +17,8 @@ public class ReactionEvent {
     private Long postId;
     private ReactionAction reactionAction;
 
-    public String getPostId() {
-        return this.postId.toString();
-    }
-
-    public String getUserId() {
-        return this.userId.toString();
-    }
-
     @Override
     public String toString() {
-        return this.reactionAction.toString() + " " + this.userId.toString() + " " + this.postId.toString();
+        return this.reactionAction.toString() + " " + this.userId + " " + this.postId;
     }
 }

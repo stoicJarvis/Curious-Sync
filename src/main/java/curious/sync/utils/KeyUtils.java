@@ -11,7 +11,7 @@ public class KeyUtils {
 
     private static final String SEPARATOR = ":";
 
-    public String getUserPostEventKey(String userId, Long postId) {
+    public String getUserPostEventKey(Long userId, Long postId) {
         return userId + SEPARATOR + postId;
     }
 

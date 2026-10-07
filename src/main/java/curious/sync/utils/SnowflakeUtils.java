@@ -15,7 +15,7 @@ import lombok.experimental.UtilityClass;
 public class SnowflakeUtils {
 
     /** Custom epoch: 2024-01-01T00:00:00Z */
-    public static final long CUSTOM_EPOCH_MS = 1704067200000L;
+    public static final long CUSTOM_EPOCH_MS = 1790640000000L;
 
     private static final int TIMESTAMP_SHIFT = 22;
 

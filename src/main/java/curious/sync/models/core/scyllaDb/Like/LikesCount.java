@@ -36,6 +36,6 @@ public class LikesCount {
     }
 
     public void setLikesCount(long count) {
-        this.count = Integer.toUnsignedLong((int) count);
+        this.count = count;
     }
 }

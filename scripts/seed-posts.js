@@ -135,9 +135,11 @@ function main() {
     // Create a unique URL
     const baseUrl = POST_URLS[i % POST_URLS.length];
     const postUrl = `https://curious-sync.app/p/${baseUrl}-${i}`;
-    
-    // Write format: postId, userId, postUrl
-    writeStream.write(`${postId},${userId},${postUrl}\n`);
+    // COPY bypasses Hibernate; createdAt has no DB default, isDeleted is NOT NULL
+    const createdAt = new Date().toISOString();
+
+    // Write format: postId, userId, postUrl, createdAt, isDeleted
+    writeStream.write(`${postId},${userId},${postUrl},${createdAt},false\n`);
     
     if (i > 0 && i % CONFIG.seeder.logInterval === 0) {
       console.log(`  Generated ${i.toLocaleString()} post rows...`);
@@ -152,7 +154,7 @@ function main() {
     // Postgres COPY command
     // Ensure these columns match EXACTLY how they appear in your Postgres database.
     // If your DB has user_id, change 'userid' to 'user_id' below.
-    const copyCmd = `psql -h ${CONFIG.db.host} -p ${CONFIG.db.port} -U ${CONFIG.db.user} -d "${CONFIG.db.name}" -c "\\copy posts(postid, userid, posturl) FROM '${CONFIG.seeder.csvPath}' WITH DELIMITER ',' CSV"`;
+    const copyCmd = `psql -h ${CONFIG.db.host} -p ${CONFIG.db.port} -U ${CONFIG.db.user} -d "${CONFIG.db.name}" -c "\\copy posts(postid, userid, posturl, createdat, isdeleted) FROM '${CONFIG.seeder.csvPath}' WITH DELIMITER ',' CSV"`;
     
     try {
       execSync(copyCmd, { env: { ...process.env, PGPASSWORD: CONFIG.db.password }, stdio: "inherit" });
