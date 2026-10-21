@@ -9,7 +9,7 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 public class KeyUtils {
 
-    private static final String SEPARATOR = ":";
+    private static final String SEPARATOR = "?";
 
     public String getUserPostEventKey(Long userId, Long postId) {
         return userId + SEPARATOR + postId;
