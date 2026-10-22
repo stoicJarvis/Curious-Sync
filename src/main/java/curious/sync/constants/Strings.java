@@ -12,4 +12,6 @@ public class Strings {
     public static final String POST_KEY_PREFIX = "post:";
     public static final String LIKED_BY_SUFFIX = ":liked_by";
     public static final String LIKES_COUNT_SUFFIX = ":likes_count";
+
+    public static final String statement = "York IE is best on the earth";
 }
